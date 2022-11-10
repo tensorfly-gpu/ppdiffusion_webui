@@ -32,6 +32,8 @@ pipeline = StableDiffusionFriendlyPipeline(superres_pipeline = pipeline_superres
 ####################################################################
 # Code to turn kwargs into Jupyter widgets
 import ipywidgets as widgets
+from ipywidgets import Layout,TwoByTwoLayout,AppLayout, \
+    HBox,VBox,Box
 from collections import OrderedDict
 
 
@@ -67,134 +69,270 @@ class StableDiffusionUI():
 class StableDiffusionUI_txt2img(StableDiffusionUI):
     def __init__(self):
         super().__init__()
+        layoutCol04 = Layout(
+            flex = "4 4 30%",
+            min_width = "160px",
+            max_width = "100%",
+            margin = "0.5em",
+            align_items = "center"
+        )
+        layoutCol08 = Layout(
+            flex = "8 8 60%",
+            min_width = "320px",
+            max_width = "100%",
+            margin = "0.5em",
+            align_items = "center"
+        )
+        syDescription = {
+            'description_width': "4rem"
+        }
+        DEFAULT_BADWORDS = "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry"
+        
         widget_opt = self.widget_opt
+        # self.hboxes = {}
+        
         widget_opt['prompt'] = widgets.Textarea(
-            layout=layout, style=style,
-            description='prompt描述' + '&nbsp;' * 22,
-            value="couple couple rings surface from (Rainbow of Van Gogh:1.1), couple couple rings in front of grey background, simple background, elegant style design, full display of fashion design",
+            layout=Layout(
+                flex = "1",
+                min_height="12em",
+                max_width = "100%",
+                margin = "0.5em",
+                align_items = 'stretch'
+                ),
+            style=syDescription,
+            description='正面描述' ,
+            value="extremely detailed CG unity 8k wallpaper,black long hair,cute face,1 adult girl,happy, green skirt dress, flower pattern in dress,solo,green gown,art of light novel,in field",
             disabled=False
         )
         widget_opt['negative_prompt'] = widgets.Textarea(
-            layout=layout, style=style,
-            description='negative_prompt反面描述 <br />',
-            value="lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry",
+            layout=Layout(
+                flex = "1",
+                #min_height="6em",
+                max_width = "100%",
+                margin = "0.5em",
+                align_items = 'stretch'
+                ),
+            style=syDescription,
+            description='负面描述',
+            tooltip="使得生成图像的质量远离负面描述的文本",
+            value=DEFAULT_BADWORDS,
             disabled=False
         )
-
-        widget_opt['height'] = widgets.IntText(
-            layout=layout, style=style,
-            description='图片的高度(像素), 64的倍数',
+        widget_opt['width'] = widgets.IntSlider(
+            layout=layoutCol04,
+            style=syDescription,
+            description='图片宽度',
             value=512,
+            min=64,
+            max=1024,
             step=64,
+            orientation='horizontal',
+            readout=True,
+            readout_format='d',
             disabled=False
         )
-
-        widget_opt['width'] = widgets.IntText(
-            layout=layout, style=style,
-            description='图片的宽度(像素), 64的倍数',
+        widget_opt['height'] = widgets.IntSlider(
+            layout=layoutCol04,
+            style=syDescription,
+            description='图片高度',
             value=512,
+            min=64,
+            max=1024,
             step=64,
+            orientation='horizontal',
+            readout=True,
             disabled=False
         )
-
-        widget_opt['num_return_images'] = widgets.BoundedIntText(
-            layout=layout, style=style,
-            description='生成图片数量' + '&nbsp;'*22,
+        
+        widget_opt['num_return_images'] = widgets.IntText(
+            layout=layoutCol04,
+            style=syDescription,
+            description='生成数量',
             value=1,
-            min=1,
-            max=100,
-            step=1,
             disabled=False
         )
+        widget_opt['enable_parsing'] = widgets.Dropdown(
+            layout=layoutCol04,
+            style=syDescription,
+            description='括号转换',
+            tooltip='增加权重所用括号的格式',
+            value="圆括号 () 加强权重",
+            options=["圆括号 () 加强权重","花括号 {} 加权权重", "否"],
+            disabled=False
+        )
+        
 
-        widget_opt['num_inference_steps'] = widgets.IntText(
-            layout=widgets.Layout(width='33%'), style=style,
-            description='推理的步数' + '&nbsp'*24 ,
+        widget_opt['num_inference_steps'] = widgets.IntSlider(
+            layout=layoutCol04,
+            style=syDescription,
+            description='推理步数',
+            tooltip='推理步数（Step）：生成图片的迭代次数，步数越多运算次数越多。',
             value=50,
+            min=2,
+            max=80,
+            orientation='horizontal',
+            readout=True,
             disabled=False
         )
-
         widget_opt['guidance_scale'] = widgets.BoundedFloatText(
-            layout=widgets.Layout(width='33%'), style=style,
-            description= '&nbsp;'*22 + 'cfg',
+            layout=layoutCol04,
+            style=syDescription,
+            description= 'CFG',
+            tooltip='引导度（CFG Scale）：控制图片与描述词之间的相关程度。',
             min=0,
             max=100,
             value=7.5,
             disabled=False
         )
 
-        widget_opt['fp16'] = widgets.Dropdown(
-            layout=widgets.Layout(width='33%'), style=style,
-            description='&nbsp;'*15 + '精度' + '&nbsp;'*1,
-            value="float32",
-            options=["float32", "float16"],
-            disabled=False
-        )
-
         widget_opt['max_embeddings_multiples'] = widgets.Dropdown(
-            layout=widgets.Layout(width='33%'), style=style,
-            description='长度上限倍数' + '&nbsp;'*21,
+            layout=layoutCol04,
+            style=syDescription,
+            description='上限倍数',
+            tooltip='修改长度上限倍数，使模型能够输入更长更多的描述词。',
             value="3",
             options=["1","2","3","4","5"],
             disabled=False
         )
-        
-        widget_opt['enable_parsing'] = widgets.Dropdown(
-            layout=widgets.Layout(width='33%'), style=style,
-            description='&nbsp;'*12 +'括号修改权重',
-            value="圆括号 () 加强权重",
-            options=["圆括号 () 加强权重","花括号 {} 加权权重", "否"],
-            disabled=False
-        )
-
-        widget_opt['output_dir'] = widgets.Text(
-            layout=layout, style=style,
-            description='图片的保存路径' + '&nbsp;'*18,
-            value="outputs/txt2img",
+        widget_opt['fp16'] = widgets.Dropdown(
+            layout=layoutCol04,
+            style=syDescription,
+            description='算术精度',
+            tooltip='模型推理使用的精度。选择float16可以加快模型的推理速度，但会牺牲部分的模型性能。',
+            value="float32",
+            options=["float32", "float16"],
             disabled=False
         )
         
         widget_opt['seed'] = widgets.IntText(
-            layout=layout, style=style,
-            description='随机数种子(-1表示不设置随机种子)',
+            layout=layoutCol04,
+            style=syDescription,
+            description='随机种子',
+            tooltip='-1表示随机生成。',
             value=-1,
+            disabled=False
+        )
+        widget_opt['superres_model_name'] = widgets.Dropdown(
+            layout=layoutCol04,
+            style=syDescription,
+            description='超分模型',
+            tooltip='放大图片所用的模型',
+            value="无",
+            options=["falsr_a", "falsr_b", "falsr_c", "无"],
+            disabled=False
+        )
+        
+        widget_opt['output_dir'] = widgets.Text(
+            layout=layoutCol08, style=syDescription,
+            description='保存路径',
+            tooltip='图片保存使用的路径',
+            value="outputs/txt2img",
             disabled=False
         )
 
         widget_opt['sampler'] = widgets.Dropdown(
-            layout=widgets.Layout(width='50%'), style=style,
-            description='采样器' + '&nbsp;'*30,
+            layout=layoutCol04, style=syDescription,
+            description='采样器',
             value="DDIM",
             options=["PNDM", "DDIM", "LMS"],
             disabled=False
         )
         widget_opt['model_name'] = widgets.Dropdown(
-            layout=layout, style=style,
-            description='需要加载的模型名称',
-            value="CompVis/stable-diffusion-v1-4",
+            layout=layoutCol04, style=syDescription,
+            description='模型名称',
+            tooltip='需要加载的模型名称',
+            value="MoososCap/NOVEL-MODEL",
             options=["CompVis/stable-diffusion-v1-4", "runwayml/stable-diffusion-v1-5", "hakurei/waifu-diffusion", "hakurei/waifu-diffusion-v1-3", "naclbit/trinart_stable_diffusion_v2_60k", "naclbit/trinart_stable_diffusion_v2_95k", "naclbit/trinart_stable_diffusion_v2_115k", "MoososCap/NOVEL-MODEL", "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1", "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1", "ruisi/anything"],
-            disabled=False
-        )
-        widget_opt['superres_model_name'] = widgets.Dropdown(
-            layout=widgets.Layout(width='50%'), style=style,
-            description='&nbsp;'*15 + '超分模型',
-            value="falsr_a",
-            options=["falsr_a", "falsr_b", "falsr_c", "无"],
             disabled=False
         )
 
         widget_opt['concepts_library_dir'] = widgets.Text(
-            layout=layout, style=style,
-            description='需要导入的"风格"或"人物"权重路径' + '&nbsp;'*4,
+            layout=layoutCol08, style=syDescription,
+            description='风格权重',
+            tooltip='TextualInversion训练的、“风格”或“人物”的权重文件路径',
             value="outputs/textual_inversion",
             disabled=False
         )
-
+        
+        btSizeVertical = widgets.Button(
+            description="竖向",
+            tooltip='竖向尺寸（512x768）',
+            disabled=False,
+            # button_style='primary',
+            icon='arrows-alt-v'
+        )
+        btSizeHorizon = widgets.Button(
+            description="横向",
+            tooltip='横向尺寸（512x768）',
+            disabled=False,
+            # button_style='primary',
+            icon='arrows-alt-h'
+        )
+        btSizeSquare = widgets.Button(
+            description="方形",
+            tooltip='正方形尺寸（640x640）',
+            disabled=False,
+            # button_style='primary',
+            icon='arrows-alt'
+        )
+        def on_set_image_size(b):
+            if b == btSizeVertical:
+                widget_opt['width'].value = 512
+                widget_opt['height'].value = 768
+            elif b == btSizeHorizon:
+                widget_opt['width'].value = 768
+                widget_opt['height'].value = 512
+            elif b == btSizeSquare:
+                widget_opt['width'].value = 640
+                widget_opt['height'].value = 640
+            else:
+                widget_opt['width'].value = 640
+                widget_opt['height'].value = 640
+        
+        btSizeVertical.on_click(on_set_image_size)
+        btSizeHorizon.on_click(on_set_image_size)
+        btSizeSquare.on_click(on_set_image_size)
+        
+        btnGoodQuality = widgets.Button(
+            description= '',
+            tooltip='填充标准质量描述',
+            disabled=False,
+            # button_style='primary',
+            icon='palette',
+            layout = Layout(
+                height = '1.8rem',
+                width = '1.8rem',
+                margin = '-9rem 0 0 2rem'
+            )
+        )
+        btnBadwards = widgets.Button(
+            description= '',
+            tooltip='填充默认负面描述',
+            disabled=False,
+            # button_style='primary',
+            icon='paper-plane',
+            layout = Layout(
+                height = '1.8rem',
+                width = '1.8rem',
+                margin = '-2rem 0px 0rem -1.8rem'
+            )
+        )
+        def fill_good_quality(b):
+            if not widget_opt['prompt'].value.startswith('high quality,masterpiece,'):
+                widget_opt['prompt'].value = 'high quality,masterpiece,' + widget_opt['prompt'].value
+        def fill_bad_words(b):
+            widget_opt['negative_prompt'].value = DEFAULT_BADWORDS
+            
+        btnGoodQuality.on_click(fill_good_quality)
+        btnBadwards.on_click(fill_bad_words)
+        
+        
+        
         self.run_button = widgets.Button(
             description='点击生成图片！',
             disabled=False,
             button_style='success', # 'success', 'info', 'warning', 'danger' or ''
-            tooltip='Click to run (settings will update automatically)',
+            tooltip='点击运行（会自动更新配置）',
             icon='check'
         )
         
@@ -240,37 +378,45 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
                     enhance_run(get_widget_extractor(widget_opt))
             enhance_button.on_click(on_enhance_button_click)
     
-        self.hboxes = {}
-        self.hboxes['param1'] = widgets.HBox([
-            widget_opt['num_inference_steps'],
-            widget_opt['guidance_scale'],
-            widget_opt['fp16']
-        ])
-        self.hboxes['tokenizer_settings'] = widgets.HBox([
-            widget_opt['max_embeddings_multiples'],
-            widget_opt['enable_parsing']
-        ])
-        self.hboxes['model'] = widgets.HBox([
-            widget_opt['model_name'],
-            widget_opt['sampler'],
-            widget_opt['superres_model_name']
-        ])
 
-        self.gui = widgets.VBox([
-            widget_opt['prompt'],
-            widget_opt['negative_prompt'],
-            widget_opt['height'],
-            widget_opt['width'],
-            widget_opt['num_return_images'],
-            self.hboxes['param1'],
-            self.hboxes['tokenizer_settings'],
-            widget_opt['output_dir'],
-            widget_opt['seed'],
-            self.hboxes['model'],
-            widget_opt['concepts_library_dir'],
-            self.run_button, 
-            self.run_button_out
-        ])
+        self.gui = Box(children = [
+                HBox([widget_opt['prompt']]),
+                HBox([widget_opt['negative_prompt']]),
+                Box(children = [
+                            btnGoodQuality, btnBadwards
+                        ], layout = Layout(
+                            height = '0',
+                            overflow = 'visible'
+                        )),
+                Box(children = [
+                    widget_opt['width'],
+                    widget_opt['height'],
+                    Box(children = [
+                            btSizeVertical,btSizeHorizon,btSizeSquare
+                        ], layout = layoutCol04
+                    ),
+                    widget_opt['num_inference_steps'],
+                    widget_opt['guidance_scale'],
+                    widget_opt['sampler'],
+                    widget_opt['num_return_images'],
+                    widget_opt['seed'],
+                    widget_opt['superres_model_name'],
+                    widget_opt['enable_parsing'],
+                    widget_opt['max_embeddings_multiples'],
+                    widget_opt['fp16'],
+                    widget_opt['output_dir'],
+                    widget_opt['model_name'],
+                    widget_opt['concepts_library_dir']
+                ], layout = Layout(
+                    display = "flex",
+                    flex_flow = "row wrap", #HBox会覆写此属性
+                    align_items = "center",
+                    max_width = '100%',
+                )),
+                self.run_button, 
+                self.run_button_out
+            ], layout = Layout(display="block",margin="0 45px 0 0")
+        )
     
 
 
