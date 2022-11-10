@@ -4,7 +4,7 @@ from contextlib import nullcontext, contextmanager
 from IPython.display import clear_output, display
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, PngImagePlugin
 import paddle
 
 _VAE_SIZE_THRESHOLD_ = 300000000       # vae should not be smaller than this
@@ -127,10 +127,15 @@ def save_image_info(image, path = './outputs/'):
     cur_time = time.time()
     seed = image.argument['seed']
     filename = f'{cur_time}_SEED_{seed}'
-    image.save(os.path.join(path, filename + '.png'), quality=100)
+    pnginfo_data = PngImagePlugin.PngInfo()
     with open(os.path.join(path, filename + '.txt'), 'w') as f:
         for key, value in image.argument.items():
             f.write(f'{key}: {value}\n')
+            pnginfo_data.add_text(key, str(value))
+    image.save(os.path.join(path, filename + '.png'), 
+        quality=100,
+        pnginfo=pnginfo_data
+    )
     
 def ReadImage(image, height = None, width = None):
     """
