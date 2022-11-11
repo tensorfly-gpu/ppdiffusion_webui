@@ -83,7 +83,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             margin = "0.5em",
             align_items = "center"
         )
-        syDescription = {
+        styleDescription = {
             'description_width': "4rem"
         }
         DEFAULT_BADWORDS = "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry"
@@ -99,8 +99,9 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
                 margin = "0.5em",
                 align_items = 'stretch'
                 ),
-            style=syDescription,
+            style=styleDescription,
             description='正面描述' ,
+            description_tooltip="仅支持(xxx)、(xxx:1.2)、[xxx]三种语法。设置括号格式可以对{}进行转换。",
             value="extremely detailed CG unity 8k wallpaper,black long hair,cute face,1 adult girl,happy, green skirt dress, flower pattern in dress,solo,green gown,art of light novel,in field",
             disabled=False
         )
@@ -112,16 +113,16 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
                 margin = "0.5em",
                 align_items = 'stretch'
                 ),
-            style=syDescription,
+            style=styleDescription,
             description='负面描述',
-            tooltip="使得生成图像的质量远离负面描述的文本",
+            description_tooltip="使生成图像的内容远离负面描述的文本",
             value=DEFAULT_BADWORDS,
             disabled=False
         )
         widget_opt['standard_size'] = widgets.Dropdown(
-            layout=layoutCol04, style=syDescription,
+            layout=layoutCol04, style=styleDescription,
             description='图片尺寸',
-            tooltip='生成图片的尺寸',
+            description_tooltip='生成图片的尺寸',
             value=5120512,
             options=[
                 ('竖向（512x768）',            5120768),
@@ -157,16 +158,17 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         
         widget_opt['num_return_images'] = widgets.IntText(
             layout=layoutCol04,
-            style=syDescription,
+            style=styleDescription,
             description='生成数量',
+            description_tooltip='生成图片的数量',
             value=1,
             disabled=False
         )
         widget_opt['enable_parsing'] = widgets.Dropdown(
             layout=layoutCol04,
-            style=syDescription,
-            description='括号转换',
-            tooltip='增加权重所用括号的格式',
+            style=styleDescription,
+            description='括号格式',
+            description_tooltip='增加权重所用括号的格式，可以将{}替换为()。选择“否”则不解析加权语法',
             value="圆括号 () 加强权重",
             options=["圆括号 () 加强权重","花括号 {} 加权权重", "否"],
             disabled=False
@@ -175,9 +177,9 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
 
         widget_opt['num_inference_steps'] = widgets.IntSlider(
             layout=layoutCol04,
-            style=syDescription,
+            style=styleDescription,
             description='推理步数',
-            tooltip='推理步数（Step）：生成图片的迭代次数，步数越多运算次数越多。',
+            description_tooltip='推理步数（Step）：生成图片的迭代次数，步数越多运算次数越多。',
             value=50,
             min=2,
             max=80,
@@ -187,9 +189,9 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         )
         widget_opt['guidance_scale'] = widgets.BoundedFloatText(
             layout=layoutCol04,
-            style=syDescription,
+            style=styleDescription,
             description= 'CFG',
-            tooltip='引导度（CFG Scale）：控制图片与描述词之间的相关程度。',
+            description_tooltip='引导度（CFG Scale）：控制图片与描述词之间的相关程度。',
             min=0,
             max=100,
             value=7.5,
@@ -198,18 +200,18 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
 
         widget_opt['max_embeddings_multiples'] = widgets.Dropdown(
             layout=layoutCol04,
-            style=syDescription,
+            style=styleDescription,
             description='上限倍数',
-            tooltip='修改长度上限倍数，使模型能够输入更长更多的描述词。',
+            description_tooltip='修改长度上限倍数，使模型能够输入更长更多的描述词。',
             value="3",
             options=["1","2","3","4","5"],
             disabled=False
         )
         widget_opt['fp16'] = widgets.Dropdown(
             layout=layoutCol04,
-            style=syDescription,
+            style=styleDescription,
             description='算术精度',
-            tooltip='模型推理使用的精度。选择float16可以加快模型的推理速度，但会牺牲部分的模型性能。',
+            description_tooltip='模型推理使用的精度。选择float16可以加快模型的推理速度，但会牺牲部分的模型性能。',
             value="float32",
             options=["float32", "float16"],
             disabled=False
@@ -217,50 +219,50 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         
         widget_opt['seed'] = widgets.IntText(
             layout=layoutCol04,
-            style=syDescription,
+            style=styleDescription,
             description='随机种子',
-            tooltip='-1表示随机生成。',
+            description_tooltip='-1表示随机生成。',
             value=-1,
             disabled=False
         )
         widget_opt['superres_model_name'] = widgets.Dropdown(
             layout=layoutCol04,
-            style=syDescription,
-            description='超分模型',
-            tooltip='放大图片所用的模型',
+            style=styleDescription,
+            description='放大图片',
+            description_tooltip='指定放大图片尺寸所用的模型',
             value="无",
             options=["falsr_a", "falsr_b", "falsr_c", "无"],
             disabled=False
         )
         
         widget_opt['output_dir'] = widgets.Text(
-            layout=layoutCol08, style=syDescription,
+            layout=layoutCol08, style=styleDescription,
             description='保存路径',
-            tooltip='图片保存使用的路径',
+            description_tooltip='用于保存输出图片的路径',
             value="outputs/txt2img",
             disabled=False
         )
 
         widget_opt['sampler'] = widgets.Dropdown(
-            layout=layoutCol04, style=syDescription,
+            layout=layoutCol04, style=styleDescription,
             description='采样器',
             value="DDIM",
             options=["PNDM", "DDIM", "LMS"],
             disabled=False
         )
         widget_opt['model_name'] = widgets.Dropdown(
-            layout=layoutCol04, style=syDescription,
+            layout=layoutCol04, style=styleDescription,
             description='模型名称',
-            tooltip='需要加载的模型名称',
+            description_tooltip='需要加载的模型名称',
             value="MoososCap/NOVEL-MODEL",
             options=["CompVis/stable-diffusion-v1-4", "runwayml/stable-diffusion-v1-5", "hakurei/waifu-diffusion", "hakurei/waifu-diffusion-v1-3", "naclbit/trinart_stable_diffusion_v2_60k", "naclbit/trinart_stable_diffusion_v2_95k", "naclbit/trinart_stable_diffusion_v2_115k", "MoososCap/NOVEL-MODEL", "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1", "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1", "ruisi/anything"],
             disabled=False
         )
 
         widget_opt['concepts_library_dir'] = widgets.Text(
-            layout=layoutCol08, style=syDescription,
+            layout=layoutCol08, style=styleDescription,
             description='风格权重',
-            tooltip='TextualInversion训练的、“风格”或“人物”的权重文件路径',
+            description_tooltip='TextualInversion训练的、“风格”或“人物”的权重文件路径',
             value="outputs/textual_inversion",
             disabled=False
         )
@@ -314,7 +316,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         )
         btnBadwards = widgets.Button(
             description= '',
-            tooltip='填充默认负面描述',
+            tooltip='填充标准负面描述',
             disabled=False,
             # button_style='primary',
             icon='paper-plane',
