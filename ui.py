@@ -118,29 +118,40 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             value=DEFAULT_BADWORDS,
             disabled=False
         )
-        widget_opt['width'] = widgets.IntSlider(
-            layout=layoutCol04,
-            style=syDescription,
-            description='图片宽度',
-            value=512,
-            min=64,
-            max=1024,
-            step=64,
-            orientation='horizontal',
-            readout=True,
-            readout_format='d',
+        widget_opt['standard_size'] = widgets.Dropdown(
+            layout=layoutCol04, style=syDescription,
+            description='图片尺寸',
+            tooltip='生成图片的尺寸',
+            value=5120512,
+            options=[
+                ('竖向（512x768）',            5120768),
+                ('横向（768x512）',            7680512),
+                ('正方形（640x640）',          6400640),
+                ('大尺寸-竖向（512x1024）',    5121024),
+                ('大尺寸-横向（1024x512）',   10240512),
+                ('大尺寸-正方形（1024x1024）',10241024),
+                ('小尺寸-竖向（384x640）',     3840640),
+                ('小尺寸-横向（640x384）',     6400384),
+                ('小尺寸-正方形（512x512）',   5120512),
+            ],
             disabled=False
         )
-        widget_opt['height'] = widgets.IntSlider(
-            layout=layoutCol04,
-            style=syDescription,
-            description='图片高度',
+        widget_opt['width'] = widgets.BoundedIntText(
+            layout=Layout(
+                flex = '1 0 2em'
+            ),
             value=512,
             min=64,
             max=1024,
             step=64,
-            orientation='horizontal',
-            readout=True,
+            disabled=False
+        )
+        widget_opt['height'] = widgets.BoundedIntText(
+            layout=widget_opt['width'].layout,
+            value=512,
+            min=64,
+            max=1024,
+            step=64,
             disabled=False
         )
         
@@ -254,44 +265,40 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             disabled=False
         )
         
-        btSizeVertical = widgets.Button(
-            description="竖向",
-            tooltip='竖向尺寸（512x768）',
-            disabled=False,
-            # button_style='primary',
-            icon='arrows-alt-v'
+        def on_standard_dize_change(change):
+            widget_opt['width'].value = change.new // 10000
+            widget_opt['height'].value = change.new % 10000
+        widget_opt['standard_size'].observe(
+                on_standard_dize_change, 
+                names = 'value'
         )
-        btSizeHorizon = widgets.Button(
-            description="横向",
-            tooltip='横向尺寸（512x768）',
-            disabled=False,
-            # button_style='primary',
-            icon='arrows-alt-h'
-        )
-        btSizeSquare = widgets.Button(
-            description="方形",
-            tooltip='正方形尺寸（640x640）',
-            disabled=False,
-            # button_style='primary',
-            icon='arrows-alt'
-        )
-        def on_set_image_size(b):
-            if b == btSizeVertical:
-                widget_opt['width'].value = 512
-                widget_opt['height'].value = 768
-            elif b == btSizeHorizon:
-                widget_opt['width'].value = 768
-                widget_opt['height'].value = 512
-            elif b == btSizeSquare:
-                widget_opt['width'].value = 640
-                widget_opt['height'].value = 640
-            else:
-                widget_opt['width'].value = 640
-                widget_opt['height'].value = 640
         
-        btSizeVertical.on_click(on_set_image_size)
-        btSizeHorizon.on_click(on_set_image_size)
-        btSizeSquare.on_click(on_set_image_size)
+        def validate_width_height(change):
+            num = change.new % 64
+            if change.new < 64:
+                change.owner.value = 64
+            elif num == 0:
+                pass
+            elif num < 32:
+                change.owner.value = change.new - num
+            else:
+                change.owner.value = change.new - num + 64
+        widget_opt['width'].observe(
+                validate_width_height,
+                names = 'value'
+            )
+        widget_opt['height'].observe(
+                validate_width_height,
+                names = 'value'
+            )
+            
+        labelSize = widgets.Label(
+                value='X',
+                layout = Layout(
+                    flex='0 0 auto',
+                    padding='0 1em'
+                )
+            )
         
         btnGoodQuality = widgets.Button(
             description= '',
@@ -325,7 +332,6 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             
         btnGoodQuality.on_click(fill_good_quality)
         btnBadwards.on_click(fill_bad_words)
-        
         
         
         self.run_button = widgets.Button(
@@ -379,33 +385,34 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             enhance_button.on_click(on_enhance_button_click)
     
 
-        self.gui = Box(children = [
+        self.gui = Box([
                 HBox([widget_opt['prompt']]),
                 HBox([widget_opt['negative_prompt']]),
-                Box(children = [
-                            btnGoodQuality, btnBadwards
-                        ], layout = Layout(
-                            height = '0',
-                            overflow = 'visible'
-                        )),
-                Box(children = [
-                    widget_opt['width'],
-                    widget_opt['height'],
-                    Box(children = [
-                            btSizeVertical,btSizeHorizon,btSizeSquare
+                Box([
+                        btnGoodQuality, btnBadwards
+                    ], layout = Layout(
+                        height = '0',
+                        overflow = 'visible'
+                    )),
+                Box([
+                    widget_opt['standard_size'],
+                    HBox([
+                            widget_opt['width'],
+                            labelSize,
+                            widget_opt['height']
                         ], layout = layoutCol04
                     ),
+                    widget_opt['superres_model_name'],
                     widget_opt['num_inference_steps'],
                     widget_opt['guidance_scale'],
                     widget_opt['sampler'],
                     widget_opt['num_return_images'],
                     widget_opt['seed'],
-                    widget_opt['superres_model_name'],
                     widget_opt['enable_parsing'],
                     widget_opt['max_embeddings_multiples'],
                     widget_opt['fp16'],
-                    widget_opt['output_dir'],
                     widget_opt['model_name'],
+                    widget_opt['output_dir'],
                     widget_opt['concepts_library_dir']
                 ], layout = Layout(
                     display = "flex",
