@@ -686,6 +686,7 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
 class SuperResolutionUI(StableDiffusionUI):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
+        self.task = 'superres'
         widget_opt = self.widget_opt
         
         layoutCol12 = Layout(
@@ -742,7 +743,6 @@ class SuperResolutionUI(StableDiffusionUI):
             margin="0 45px 0 0"
         ))
 
-        self.task = 'superres'
 
 
 
@@ -807,73 +807,114 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
         self.parse_args = textual_inversion_parse_args
         self.main = textual_inversion_main
 
+        layoutCol04 = Layout(
+            flex = "4 4 30%",
+            min_width = "160px",
+            max_width = "100%",
+            margin = "0.5em",
+            align_items = "center"
+        )
+        layoutCol08 = Layout(
+            flex = "8 8 60%",
+            min_width = "320px",
+            max_width = "100%",
+            margin = "0.5em",
+            align_items = "center"
+        )
+        layoutCol12 = Layout(
+            flex = "12 12 90%",
+            margin = "0.5em",
+            max_width = "100%",
+            align_items = "center"
+        )
+        styleDescription = {
+            'description_width': "10rem"
+        }
+        
         widget_opt = self.widget_opt
         widget_opt['learnable_property'] = widgets.Dropdown(
-            layout=layout, style=style,
-            description='需要学习什么？风格或实体',
+            layout=layoutCol12, style=styleDescription,
+            description='训练目标',
+            description_tooltip='训练目标是什么？风格还是实体？',
             value="object",
-            options=["style", "object"],
+            options=[
+                ('风格（style）',  "style"),
+                ('实体（object）', "object"),
+            ],
+            orientation='horizontal',
             disabled=False
         )
-        widget_opt['placeholder_token'] = widgets.Textarea(
-            layout=layout, style=style,
-            description='用来表示该内容的新词' + '&nbsp' * 7,
+        widget_opt['placeholder_token'] = widgets.Text(
+            layout=layoutCol12, style=styleDescription,
+            description='用来表示该内容的新词',
+            description_tooltip='用来表示该内容的新词，建议用<>封闭',
             value="<Alice>",
             disabled=False
         )
-        widget_opt['initializer_token'] = widgets.Textarea(
-            layout=layout, style=style,
-            description='该内容最接近的单词是' + '&nbsp' * 7,
+        widget_opt['initializer_token'] = widgets.Text(
+            layout=layoutCol12, style=styleDescription,
+            description='该内容最接近的单词是',
+            description_tooltip='该内容最接近的单词是？若无则用*表示',
             value="girl",
             disabled=False
         )
         widget_opt['repeats'] = widgets.IntText(
-            layout=layout, style=style,
-            description='训练图片需要重复多少遍' + '&nbsp' * 3,
+            layout=layoutCol12, style=styleDescription,
+            description='图片重复次数',
+            description_tooltip='训练图片需要重复多少遍',
             value="100",
             disabled=False
         )
         widget_opt['train_data_dir'] = widgets.Text(
-            layout=layout, style=style,
-            description='训练图片的文件夹路径' + '&nbsp' * 7,
+            layout=layoutCol12, style=styleDescription,
+            description='训练图片的文件夹路径',
             value="resources/Alices",
             disabled=False
         )
         widget_opt['output_dir'] = widgets.Text(
-            layout=layout, style=style,
-            description='训练结果的保存路径' + '&nbsp' * 10,
+            layout=layoutCol12, style=styleDescription,
+            description='训练结果的保存路径',
             value="outputs/textual_inversion",
             disabled=False
         )
-        widget_opt['height'] = widgets.IntText(
-            layout=layout, style=style,
-            description='训练图片的高度(像素), 64的倍数',
+        widget_opt['height'] = widgets.IntSlider(
+            layout=layoutCol12, style=styleDescription,
+            description='训练图片的高度',
+            description_tooltip='训练图片的高度。越大尺寸，消耗的显存也越多。',
             value=512,
+            min=64,
+            max=1024,
             step=64,
-            disabled=False
+            disabled=True
         )
-        widget_opt['width'] = widgets.IntText(
-            layout=layout, style=style,
-            description='训练图片的宽度(像素), 64的倍数',
+        widget_opt['width'] = widgets.IntSlider(
+            layout=layoutCol12, style=styleDescription,
+            description='训练图片的宽度',
+            description_tooltip='训练图片的宽度。越大尺寸，消耗的显存也越多。',
             value=512,
+            min=64,
+            max=1024,
             step=64,
-            disabled=False
+            disabled=True
         )
         widget_opt['learning_rate'] = widgets.FloatText(
-            layout=layout, style=style,
-            description='训练学习率' + '&nbsp' * 24,
+            layout=layoutCol12, style=styleDescription,
+            description='训练学习率',
+            description_tooltip='训练学习率',
             value=5e-4,
+            step=1e-4,
             disabled=False
         )
         widget_opt['max_train_steps'] = widgets.IntText(
-            layout=layout, style=style,
-            description='最大训练步数' + '&nbsp' * 21,
+            layout=layoutCol12, style=styleDescription,
+            description='最大训练步数',
+            description_tooltip='最大训练步数',
             value=500,
             step=100,
             disabled=False
         )
         widget_opt['model_name'] = widgets.Dropdown(
-            layout=layout, style=style,
+            layout=layoutCol12, style=styleDescription,
             description='需要训练的模型名称',
             value="hakurei/waifu-diffusion-v1-3",
             options=["CompVis/stable-diffusion-v1-4", "runwayml/stable-diffusion-v1-5", "hakurei/waifu-diffusion", "hakurei/waifu-diffusion-v1-3", "naclbit/trinart_stable_diffusion_v2_60k", "naclbit/trinart_stable_diffusion_v2_95k", "naclbit/trinart_stable_diffusion_v2_115k", "MoososCap/NOVEL-MODEL", "ruisi/anything"],
@@ -884,14 +925,35 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
             description='开始训练',
             disabled=False,
             button_style='success', # 'success', 'info', 'warning', 'danger' or ''
-            tooltip='Click to run (settings will update automatically)',
+            tooltip='点击运行（配置将自动更新）',
             icon='check'
         )
         self.run_button.on_click(self.on_run_button_click)
         
-        self.gui = widgets.VBox([widget_opt[k] for k in list(widget_opt.keys())]
-                            +   [self.run_button, self.run_button_out])
-
+        self.gui = Box([
+                Box([
+                    widget_opt['learnable_property'],
+                    widget_opt['placeholder_token'],
+                    widget_opt['initializer_token'],
+                    widget_opt['train_data_dir'],
+                    widget_opt['width'],
+                    widget_opt['height'],
+                    widget_opt['repeats'],
+                    widget_opt['learning_rate'],
+                    widget_opt['max_train_steps'],
+                    widget_opt['model_name'],
+                    widget_opt['output_dir'],
+                    
+                ], layout = Layout(
+                    display = "flex",
+                    flex_flow = "row wrap", #HBox会覆写此属性
+                    align_items = "center",
+                    max_width = '100%',
+                )),
+                self.run_button, 
+                self.run_button_out
+            ], layout = Layout(display="block",margin="0 45px 0 0")
+        )
 
 class StableDiffusionUI_text_inversion_prediction(StableDiffusionUI):
     def __init__(self):
