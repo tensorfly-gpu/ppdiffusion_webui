@@ -178,16 +178,16 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         )
         
 
-        widget_opt['num_inference_steps'] = widgets.IntSlider(
+        widget_opt['num_inference_steps'] = widgets.BoundedIntText(
             layout=layoutCol04,
             style=styleDescription,
             description='推理步数',
             description_tooltip='推理步数（Step）：生成图片的迭代次数，步数越多运算次数越多。',
             value=50,
             min=2,
-            max=80,
-            orientation='horizontal',
-            readout=True,
+            max=250,
+            # orientation='horizontal',
+            # readout=True,
             disabled=False
         )
         widget_opt['guidance_scale'] = widgets.BoundedFloatText(
@@ -540,15 +540,15 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
             continuous_update=False
         )
 
-        widget_opt['num_inference_steps'] = widgets.IntSlider(
+        widget_opt['num_inference_steps'] = widgets.BoundedIntText(
             layout=layoutCol04, style=styleDescription,
             description='推理步数',
             description_tooltip='推理步数（Step）：生成图片的迭代次数，步数越多运算次数越多。',
             value=50,
             min=2,
-            max=80,
-            orientation='horizontal',
-            readout=True,
+            max=250,
+            # orientation='horizontal',
+            # readout=True,
             disabled=False
         )
 
