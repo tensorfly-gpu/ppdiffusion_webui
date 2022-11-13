@@ -71,14 +71,14 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         super().__init__()
         layoutCol04 = Layout(
             flex = "4 4 30%",
-            min_width = "160px",
+            min_width = "5rem",    #480/ sm-576, md768, lg-992, xl-12000
             max_width = "100%",
             margin = "0.5em",
             align_items = "center"
         )
         layoutCol08 = Layout(
             flex = "8 8 60%",
-            min_width = "320px",
+            min_width = "10rem",
             max_width = "100%",
             margin = "0.5em",
             align_items = "center"
@@ -87,7 +87,50 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             'description_width': "4rem"
         }
         DEFAULT_BADWORDS = "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry"
-        
+        STYLE_SHEETS = '''
+<style>
+@media (max-width:566px) {
+    .StableDiffusionUI_txt2img {
+        margin-right: 0 !important;
+    }
+    .StableDiffusionUI_txt2img .widget-text,
+    .StableDiffusionUI_txt2img .widget-dropdown,
+    .StableDiffusionUI_txt2img .widget-textarea {
+        flex-wrap: wrap !important;
+        height: auto;
+        margin-top: 0.1rem !important;
+        margin-bottom: 0.1rem !important;
+    }
+    .StableDiffusionUI_txt2img .widget-text > label,
+    .StableDiffusionUI_txt2img .widget-dropdown > label,
+    .StableDiffusionUI_txt2img .widget-textarea > label {
+        width: 100% !important;
+        text-align: left !important;
+        font-size: small !important;
+    }
+    .StableDiffusionUI_txt2img .prompt > textarea {
+        min-height:10em;
+        margin-left:2rem!important;
+    }
+    .StableDiffusionUI_txt2img .negative_prompt > textarea {
+        margin-left:2rem!important;
+    }
+    .StableDiffusionUI_txt2img .standard_size,
+    .StableDiffusionUI_txt2img .superres_model_name {
+        order: -1;
+    }
+    .StableDiffusionUI_txt2img .box_width_height {
+        flex: 8 8 60% !important;
+    }
+    .StableDiffusionUI_txt2img .box_wrap_quikbtns {
+        margin-left: 0 !important;
+    }
+    .StableDiffusionUI_txt2img .box_wrap_quikbtns>button {
+        padding: 0 !important;
+    }
+}
+</style>
+'''
         widget_opt = self.widget_opt
         # self.hboxes = {}
         
@@ -105,6 +148,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             value="extremely detailed CG unity 8k wallpaper,black long hair,cute face,1 adult girl,happy, green skirt dress, flower pattern in dress,solo,green gown,art of light novel,in field",
             disabled=False
         )
+        widget_opt['prompt'].add_class('prompt');
         widget_opt['negative_prompt'] = widgets.Textarea(
             layout=Layout(
                 flex = "1",
@@ -119,6 +163,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             value=DEFAULT_BADWORDS,
             disabled=False
         )
+        widget_opt['negative_prompt'].add_class('negative_prompt');
         widget_opt['standard_size'] = widgets.Dropdown(
             layout=layoutCol04, style=styleDescription,
             description='图片尺寸',
@@ -137,6 +182,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             ],
             disabled=False
         )
+        widget_opt['standard_size'].add_class('standard_size');
         widget_opt['width'] = widgets.BoundedIntText(
             layout=Layout(
                 flex = '1 0 2em'
@@ -237,6 +283,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             options=["falsr_a", "falsr_b", "falsr_c", "无"],
             disabled=False
         )
+        widget_opt['superres_model_name'].add_class('superres_model_name');
         
         widget_opt['output_dir'] = widgets.Text(
             layout=layoutCol08, style=styleDescription,
@@ -309,24 +356,24 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             description= '',
             tooltip='填充标准质量描述',
             disabled=False,
-            # button_style='primary',
             icon='palette',
             layout = Layout(
+                position = 'absolute',
                 height = '1.8rem',
                 width = '1.8rem',
-                margin = '-9rem 0 0 2rem'
+                margin = '-7rem 0 0 0'
             )
         )
         btnBadwards = widgets.Button(
             description= '',
             tooltip='填充标准负面描述',
             disabled=False,
-            # button_style='primary',
             icon='paper-plane',
             layout = Layout(
+                position = 'absolute',
                 height = '1.8rem',
                 width = '1.8rem',
-                margin = '-2rem 0px 0rem -1.8rem'
+                margin = '2rem 0px 0rem -1.8rem'
             )
         )
         def fill_good_quality(b):
@@ -389,24 +436,29 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
                     enhance_run(get_widget_extractor(widget_opt))
             enhance_button.on_click(on_enhance_button_click)
     
-
+        box_width_height = HBox([
+                                    widget_opt['width'],
+                                    labelSize,
+                                    widget_opt['height']
+                                ], layout = layoutCol04
+                            )
+        box_width_height.add_class('box_width_height')
+        box_wrap_quikbtns = Box([
+                                btnGoodQuality,btnBadwards,
+                            ], layout = Layout(
+                                margin = '0 1rem',
+                                height = '0',
+                                overflow = 'visible'
+                            ));
+        box_wrap_quikbtns.add_class('box_wrap_quikbtns')
         self.gui = Box([
+                widgets.HTML(STYLE_SHEETS),
                 HBox([widget_opt['prompt']]),
+                box_wrap_quikbtns,
                 HBox([widget_opt['negative_prompt']]),
                 Box([
-                        btnGoodQuality, btnBadwards
-                    ], layout = Layout(
-                        height = '0',
-                        overflow = 'visible'
-                    )),
-                Box([
                     widget_opt['standard_size'],
-                    HBox([
-                            widget_opt['width'],
-                            labelSize,
-                            widget_opt['height']
-                        ], layout = layoutCol04
-                    ),
+                    box_width_height,
                     widget_opt['superres_model_name'],
                     widget_opt['num_inference_steps'],
                     widget_opt['guidance_scale'],
@@ -429,7 +481,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
                 self.run_button_out
             ], layout = Layout(display="block",margin="0 45px 0 0")
         )
-    
+        self.gui.add_class('StableDiffusionUI_txt2img')
 
 
 class StableDiffusionUI_img2img(StableDiffusionUI):
