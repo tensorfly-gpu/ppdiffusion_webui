@@ -361,7 +361,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
                 position = 'absolute',
                 height = '1.8rem',
                 width = '1.8rem',
-                margin = '-7rem 0 0 0'
+                margin = '-11rem 0 0 0'
             )
         )
         btnBadwards = widgets.Button(
@@ -373,7 +373,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
                 position = 'absolute',
                 height = '1.8rem',
                 width = '1.8rem',
-                margin = '2rem 0px 0rem -1.8rem'
+                margin = '-2rem 0px 0rem -1.8rem'
             )
         )
         def fill_good_quality(b):
@@ -454,8 +454,8 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         self.gui = Box([
                 widgets.HTML(STYLE_SHEETS),
                 HBox([widget_opt['prompt']]),
-                box_wrap_quikbtns,
                 HBox([widget_opt['negative_prompt']]),
+                box_wrap_quikbtns,
                 Box([
                     widget_opt['standard_size'],
                     box_width_height,
