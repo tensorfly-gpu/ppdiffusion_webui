@@ -348,6 +348,21 @@ class StableDiffusionFriendlyPipeline():
                                     max_embeddings_multiples=int(opt.max_embeddings_multiples),
                                     skip_parsing=(not enable_parsing)
                                 )[0][0]
+        elif task == 'inpaint':
+            init_image = ReadImage(opt.image_path, height=opt.height, width=opt.width)
+            mask_image = ReadImage(opt.mask_path, height=opt.height, width=opt.width)
+            def task_func():
+                return self.pipe.inpaint(
+                                    prompt, seed=seed, 
+                                    init_image=init_image, 
+                                    mask_image=mask_image, 
+                                    num_inference_steps=opt.num_inference_steps, 
+                                    strength=opt.strength, 
+                                    guidance_scale=opt.guidance_scale, 
+                                    negative_prompt=negative_prompt,
+                                    max_embeddings_multiples=int(opt.max_embeddings_multiples),
+                                    skip_parsing=(not enable_parsing)
+                                )[0][0]
             
         if opt.fp16 == 'float16':
             context = paddle.amp.auto_cast(True, level = 'O2') # level = 'O2' # seems to have BUG if enable O2
@@ -370,6 +385,10 @@ class StableDiffusionFriendlyPipeline():
 
                 if task == 'img2img':
                     image.argument['init_image'] = opt.image_path
+                elif task == 'inpaint':
+                    image.argument['init_image'] = opt.image_path
+                    image.argument['mask_path'] = opt.mask_path
+                        
 
                 image.argument['model_name'] = opt.model_name
 
