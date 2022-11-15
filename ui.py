@@ -317,11 +317,11 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             disabled=False
         )
         
-        def on_standard_dize_change(change):
+        def on_standard_size_change(change):
             widget_opt['width'].value = change.new // 10000
             widget_opt['height'].value = change.new % 10000
         widget_opt['standard_size'].observe(
-                on_standard_dize_change, 
+                on_standard_size_change, 
                 names = 'value'
         )
         
@@ -384,6 +384,15 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             
         btnGoodQuality.on_click(fill_good_quality)
         btnBadwards.on_click(fill_bad_words)
+        
+        def on_seed_change(change):
+            if change.new != -1:
+                widget_opt['num_return_images'].value = 1
+        def on_num_return_images(change):
+            if change.new != 1:
+                widget_opt['seed'].value = -1
+        widget_opt['seed'].observe(on_seed_change, names='value')
+        widget_opt['num_return_images'].observe(on_num_return_images, names='value')
         
         
         self.run_button = widgets.Button(
