@@ -300,12 +300,13 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             options=["PNDM", "DDIM", "LMS"],
             disabled=False
         )
-        widget_opt['model_name'] = widgets.Dropdown(
-            layout=layoutCol04, style=styleDescription,
+        widget_opt['model_name'] = widgets.Combobox(
+            layout=layoutCol08, style=styleDescription,
             description='模型名称',
             description_tooltip='需要加载的模型名称',
             value="MoososCap/NOVEL-MODEL",
             options=["CompVis/stable-diffusion-v1-4", "runwayml/stable-diffusion-v1-5", "hakurei/waifu-diffusion", "hakurei/waifu-diffusion-v1-3", "naclbit/trinart_stable_diffusion_v2_60k", "naclbit/trinart_stable_diffusion_v2_95k", "naclbit/trinart_stable_diffusion_v2_115k", "MoososCap/NOVEL-MODEL", "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1", "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1", "ruisi/anything"],
+            ensure_option=False,
             disabled=False
         )
 
@@ -377,8 +378,8 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             )
         )
         def fill_good_quality(b):
-            if not widget_opt['prompt'].value.startswith('high quality,masterpiece,'):
-                widget_opt['prompt'].value = 'high quality,masterpiece,' + widget_opt['prompt'].value
+            if not widget_opt['prompt'].value.startswith('masterpiece,best quality,'):
+                widget_opt['prompt'].value = 'masterpiece,best quality,' + widget_opt['prompt'].value
         def fill_bad_words(b):
             widget_opt['negative_prompt'].value = DEFAULT_BADWORDS
             
@@ -593,7 +594,7 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
             value=0.8,
             min=0,
             max=1,
-            step=0.1,
+            step=0.05,
             readout=True,
             readout_format='.1f',
             orientation='horizontal',
@@ -665,12 +666,14 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
             options=["PNDM", "DDIM", "LMS"],
             disabled=False
         )
-        widget_opt['model_name'] = widgets.Dropdown(
-            layout=layoutCol04, style=styleDescription,
+            
+        widget_opt['model_name'] = widgets.Combobox(
+            layout=layoutCol08, style=styleDescription,
             description='模型名称',
             description_tooltip='需要加载的模型名称',
             value="CompVis/stable-diffusion-v1-4",
             options=["CompVis/stable-diffusion-v1-4", "runwayml/stable-diffusion-v1-5", "hakurei/waifu-diffusion", "hakurei/waifu-diffusion-v1-3", "naclbit/trinart_stable_diffusion_v2_60k", "naclbit/trinart_stable_diffusion_v2_95k", "naclbit/trinart_stable_diffusion_v2_115k", "MoososCap/NOVEL-MODEL", "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1", "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1", "ruisi/anything"],
+            ensure_option=False,
             disabled=False
         )
         widget_opt['superres_model_name'] = widgets.Dropdown(
@@ -923,12 +926,13 @@ class StableDiffusionUI_inpaint(StableDiffusionUI):
             options=["PNDM", "DDIM", "LMS"],
             disabled=False
         )
-        widget_opt['model_name'] = widgets.Dropdown(
-            layout=layoutCol04, style=styleDescription,
+        widget_opt['model_name'] = widgets.Combobox(
+            layout=layoutCol08, style=styleDescription,
             description='模型名称',
             description_tooltip='需要加载的模型名称',
             value="MoososCap/NOVEL-MODEL",
             options=["CompVis/stable-diffusion-v1-4", "runwayml/stable-diffusion-v1-5", "hakurei/waifu-diffusion", "hakurei/waifu-diffusion-v1-3", "naclbit/trinart_stable_diffusion_v2_60k", "naclbit/trinart_stable_diffusion_v2_95k", "naclbit/trinart_stable_diffusion_v2_115k", "MoososCap/NOVEL-MODEL", "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1", "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1", "ruisi/anything"],
+            ensure_option=False,
             disabled=False
         )
         widget_opt['superres_model_name'] = widgets.Dropdown(
@@ -1233,11 +1237,12 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
             step=100,
             disabled=False
         )
-        widget_opt['model_name'] = widgets.Dropdown(
+        widget_opt['model_name'] = widgets.Combobox(
             layout=layoutCol12, style=styleDescription,
             description='需要训练的模型名称',
             value="hakurei/waifu-diffusion-v1-3",
             options=["CompVis/stable-diffusion-v1-4", "runwayml/stable-diffusion-v1-5", "hakurei/waifu-diffusion", "hakurei/waifu-diffusion-v1-3", "naclbit/trinart_stable_diffusion_v2_60k", "naclbit/trinart_stable_diffusion_v2_95k", "naclbit/trinart_stable_diffusion_v2_115k", "MoososCap/NOVEL-MODEL", "ruisi/anything"],
+            ensure_option=False,
             disabled=False
         )
         
