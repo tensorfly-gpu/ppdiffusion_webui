@@ -7,7 +7,7 @@ from IPython.display import clear_output
 from utils import diffusers_auto_update
 diffusers_auto_update(hint_kernel_restart = True)
 
-from tqdm.auto import tqdm
+#from tqdm.auto import tqdm
 import paddle
 
 from textual_inversion import parse_args as textual_inversion_parse_args
@@ -15,7 +15,7 @@ from textual_inversion import main as textual_inversion_main
 from utils import StableDiffusionFriendlyPipeline, SuperResolutionPipeline, diffusers_auto_update
 from utils import compute_gpu_memory, empty_cache
 
-_ENABLE_ENHANCE = False
+#_ENABLE_ENHANCE = False
 
 if paddle.device.get_device() != 'cpu':
     # settings for super-resolution, currently not supporting multi-gpus
@@ -32,8 +32,7 @@ pipeline = StableDiffusionFriendlyPipeline(superres_pipeline = pipeline_superres
 ####################################################################
 # Code to turn kwargs into Jupyter widgets
 import ipywidgets as widgets
-from ipywidgets import Layout,TwoByTwoLayout,AppLayout, \
-    HBox,VBox,Box
+from ipywidgets import Layout,HBox,VBox,Box
 from collections import OrderedDict
 
 
@@ -69,27 +68,14 @@ class StableDiffusionUI():
 class StableDiffusionUI_txt2img(StableDiffusionUI):
     def __init__(self):
         super().__init__()
-        layoutCol04 = Layout(
-            flex = "4 4 30%",
-            min_width = "5rem",    #480/ sm-576, md768, lg-992, xl-12000
-            max_width = "100%",
-            margin = "0.5em",
-            align_items = "center"
-        )
-        layoutCol08 = Layout(
-            flex = "8 8 60%",
-            min_width = "10rem",
-            max_width = "100%",
-            margin = "0.5em",
-            align_items = "center"
-        )
+        
         styleDescription = {
             'description_width': "4rem"
         }
         DEFAULT_BADWORDS = "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry"
         STYLE_SHEETS = '''
 <style>
-@media (max-width:566px) {
+@media (max-width:576px) {
     .StableDiffusionUI_txt2img {
         margin-right: 0 !important;
     }
@@ -132,57 +118,20 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
 </style>
 '''
         widget_opt = self.widget_opt
-        # self.hboxes = {}
         
-        widget_opt['prompt'] = widgets.Textarea(
-            layout=Layout(
-                flex = "1",
-                min_height="12em",
-                max_width = "100%",
-                margin = "0.5em",
-                align_items = 'stretch'
-                ),
-            style=styleDescription,
-            description='正面描述' ,
-            description_tooltip="仅支持(xxx)、(xxx:1.2)、[xxx]三种语法。设置括号格式可以对{}进行转换。",
+        import views
+        
+        widget_opt['prompt'] = views.createView(
+            'prompt',
             value="extremely detailed CG unity 8k wallpaper,black long hair,cute face,1 adult girl,happy, green skirt dress, flower pattern in dress,solo,green gown,art of light novel,in field",
-            disabled=False
         )
-        widget_opt['prompt'].add_class('prompt');
-        widget_opt['negative_prompt'] = widgets.Textarea(
-            layout=Layout(
-                flex = "1",
-                #min_height="6em",
-                max_width = "100%",
-                margin = "0.5em",
-                align_items = 'stretch'
-                ),
-            style=styleDescription,
-            description='负面描述',
-            description_tooltip="使生成图像的内容远离负面描述的文本",
+        widget_opt['negative_prompt'] = views.createView(
+            'negative_prompt',
             value=DEFAULT_BADWORDS,
-            disabled=False
         )
-        widget_opt['negative_prompt'].add_class('negative_prompt');
-        widget_opt['standard_size'] = widgets.Dropdown(
-            layout=layoutCol04, style=styleDescription,
-            description='图片尺寸',
-            description_tooltip='生成图片的尺寸',
-            value=5120512,
-            options=[
-                ('竖向（512x768）',            5120768),
-                ('横向（768x512）',            7680512),
-                ('正方形（640x640）',          6400640),
-                ('大尺寸-竖向（512x1024）',    5121024),
-                ('大尺寸-横向（1024x512）',   10240512),
-                ('大尺寸-正方形（1024x1024）',10241024),
-                ('小尺寸-竖向（384x640）',     3840640),
-                ('小尺寸-横向（640x384）',     6400384),
-                ('小尺寸-正方形（512x512）',   5120512),
-            ],
-            disabled=False
+        widget_opt['standard_size'] = views.createView(
+            'standard_size',
         )
-        widget_opt['standard_size'].add_class('standard_size');
         widget_opt['width'] = widgets.BoundedIntText(
             layout=Layout(
                 flex = '1 0 2em'
@@ -202,120 +151,46 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             disabled=False
         )
         
-        widget_opt['num_return_images'] = widgets.BoundedIntText(
-            layout=layoutCol04,
-            style=styleDescription,
-            description='生成数量',
-            description_tooltip='生成图片的数量',
-            value=1,
-            min=1,
-            max=100,
-            step=1,
-            disabled=False
+        widget_opt['num_return_images'] = views.createView(
+            'num_return_images',
         )
-        widget_opt['enable_parsing'] = widgets.Dropdown(
-            layout=layoutCol04,
-            style=styleDescription,
-            description='括号格式',
-            description_tooltip='增加权重所用括号的格式，可以将{}替换为()。选择“否”则不解析加权语法',
-            value="圆括号 () 加强权重",
-            options=["圆括号 () 加强权重","花括号 {} 加权权重", "否"],
-            disabled=False
+        widget_opt['enable_parsing'] = views.createView(
+            'enable_parsing',
         )
-        
-
-        widget_opt['num_inference_steps'] = widgets.BoundedIntText(
-            layout=layoutCol04,
-            style=styleDescription,
-            description='推理步数',
-            description_tooltip='推理步数（Step）：生成图片的迭代次数，步数越多运算次数越多。',
-            value=50,
-            min=2,
-            max=250,
-            # orientation='horizontal',
-            # readout=True,
-            disabled=False
+        widget_opt['num_inference_steps'] = views.createView(
+            'num_inference_steps',
         )
-        widget_opt['guidance_scale'] = widgets.BoundedFloatText(
-            layout=layoutCol04,
-            style=styleDescription,
-            description= 'CFG',
-            description_tooltip='引导度（CFG Scale）：控制图片与描述词之间的相关程度。',
-            min=0,
-            max=100,
-            value=7.5,
-            disabled=False
+        widget_opt['guidance_scale'] = views.createView(
+            'guidance_scale',
         )
 
-        widget_opt['max_embeddings_multiples'] = widgets.Dropdown(
-            layout=layoutCol04,
-            style=styleDescription,
-            description='上限倍数',
-            description_tooltip='修改长度上限倍数，使模型能够输入更长更多的描述词。',
-            value="3",
-            options=["1","2","3","4","5"],
-            disabled=False
+        widget_opt['max_embeddings_multiples'] = views.createView(
+            'max_embeddings_multiples',
         )
-        widget_opt['fp16'] = widgets.Dropdown(
-            layout=layoutCol04,
-            style=styleDescription,
-            description='算术精度',
-            description_tooltip='模型推理使用的精度。选择float16可以加快模型的推理速度，但会牺牲部分的模型性能。',
-            value="float32",
-            options=["float32", "float16"],
-            disabled=False
+        widget_opt['fp16'] = views.createView(
+            'fp16',
         )
         
-        widget_opt['seed'] = widgets.IntText(
-            layout=layoutCol04,
-            style=styleDescription,
-            description='随机种子',
-            description_tooltip='-1表示随机生成。',
-            value=-1,
-            disabled=False
+        widget_opt['seed'] = views.createView(
+            'seed',
         )
-        widget_opt['superres_model_name'] = widgets.Dropdown(
-            layout=layoutCol04,
-            style=styleDescription,
-            description='图像放大',
-            description_tooltip='指定放大图片尺寸所用的模型',
-            value="无",
-            options=["falsr_a", "falsr_b", "falsr_c", "无"],
-            disabled=False
+        widget_opt['superres_model_name'] = views.createView(
+            'superres_model_name',
         )
-        widget_opt['superres_model_name'].add_class('superres_model_name');
         
-        widget_opt['output_dir'] = widgets.Text(
-            layout=layoutCol08, style=styleDescription,
-            description='保存路径',
-            description_tooltip='用于保存输出图片的路径',
+        widget_opt['output_dir'] = views.createView(
+            'output_dir',
             value="outputs/txt2img",
-            disabled=False
         )
 
-        widget_opt['sampler'] = widgets.Dropdown(
-            layout=layoutCol04, style=styleDescription,
-            description='采样器',
-            value="DDIM",
-            options=["PNDM", "DDIM", "LMS"],
-            disabled=False
+        widget_opt['sampler'] = views.createView(
+            'sampler',
         )
-        widget_opt['model_name'] = widgets.Combobox(
-            layout=layoutCol08, style=styleDescription,
-            description='模型名称',
-            description_tooltip='需要加载的模型名称',
-            value="MoososCap/NOVEL-MODEL",
-            options=["CompVis/stable-diffusion-v1-4", "runwayml/stable-diffusion-v1-5", "hakurei/waifu-diffusion", "hakurei/waifu-diffusion-v1-3", "naclbit/trinart_stable_diffusion_v2_60k", "naclbit/trinart_stable_diffusion_v2_95k", "naclbit/trinart_stable_diffusion_v2_115k", "MoososCap/NOVEL-MODEL", "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1", "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1", "ruisi/anything"],
-            ensure_option=False,
-            disabled=False
+        widget_opt['model_name'] = views.createView(
+            'model_name',
         )
-
-        widget_opt['concepts_library_dir'] = widgets.Text(
-            layout=layoutCol08, style=styleDescription,
-            description='风格权重',
-            description_tooltip='TextualInversion训练的、“风格”或“人物”的权重文件路径',
-            value="outputs/textual_inversion",
-            disabled=False
+        widget_opt['concepts_library_dir'] = views.createView(
+            'concepts_library_dir',
         )
         
         def on_standard_size_change(change):
@@ -406,52 +281,13 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         
         self.run_button.on_click(self.on_run_button_click)
         
-        if _ENABLE_ENHANCE:
-            widget_opt['image_dir'] = widgets.Text(
-                layout=layout, style=style,
-                description='需要放大图片的文件夹地址。',
-                value="outputs/highres",
-                disabled=False
-            )
-            widget_opt['upscale_image_dir'] = widgets.Text(
-                layout=layout, style=style,
-                description='放大后的图片所要保存的文件夹地址。',
-                value="upscale_outputs",
-                disabled=False
-            )
-            widget_opt['upscale_model_name'] = widgets.Dropdown(
-                layout=layout, style=style,
-                description='放大图片所用的模型',
-                value="RealESRGAN_x4plus",
-                options=[
-                        'RealESRGAN_x4plus', 'RealESRGAN_x4plus_anime_6B', 'RealSR',
-                        'RealESRGAN_x4', 'RealESRGAN_x2', 'RealESRGAN_x8'
-                    ],
-                disabled=False
-            )
-
-            enhance_button = widgets.Button(
-                description='开始放大图片！',
-                disabled=False,
-                button_style='', # 'success', 'info', 'warning', 'danger' or ''
-                tooltip='Click to run (settings will update automatically)',
-                icon='check'
-            )
-            enhance_button_out = widgets.Output()
-            def on_enhance_button_click(b):
-                with run_button_out:
-                    clear_output()
-                with enhance_button_out:
-                    clear_output()
-                    enhance_run(get_widget_extractor(widget_opt))
-            enhance_button.on_click(on_enhance_button_click)
-    
         box_width_height = HBox([
                                     widget_opt['width'],
                                     labelSize,
                                     widget_opt['height']
-                                ], layout = layoutCol04
+                                ],
                             )
+        views.setLayout('col04', box_width_height)
         box_width_height.add_class('box_width_height')
         box_wrap_quikbtns = Box([
                                 btnGoodQuality,btnBadwards,
