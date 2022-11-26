@@ -112,6 +112,15 @@ def package_install(verbose = True, dev_paddle = False):
 def diffusers_auto_update(verbose = True, hint_kernel_restart = False, dev_paddle = False):
     package_install(dev_paddle = dev_paddle)
 
+def try_get_catched_model(model_name):
+    path = os.path.join('./models/', model_name)
+    if check_is_model_complete(path):
+        return path
+    path = os.path.join('./', model_name)
+    if check_is_model_complete(path):
+        return path
+    return model_name
+    
 @contextmanager
 def context_nologging():
     import logging
@@ -121,6 +130,26 @@ def context_nologging():
     finally:
         logging.disable(30)
 
+def serialize_png_info(argument):
+    labels = { 'prompt': '',
+        'negative_prompt': 'Negative prompt: ', #用于与webui保持一致
+        'num_inference_steps': 'Steps: ', #用于与webui保持一致
+        'sampler': 'Sampler: ',
+        'guidance_scale': 'CFG Scale: ',
+        'strength': 'Strength',
+        'seed': 'Seed: ',
+        'width':'width: ',
+        'height':'height: ',
+    }
+    info = ''
+    for k in labels:
+        if k in argument: info += labels[k] + str(argument[k]) + '\n'
+    
+    for k in argument:
+        if k not in labels: info += k + ': ' + str(argument[k]) + '\n'
+    
+    return info
+        
 def save_image_info(image, path = './outputs/'):
     """Save image to a path with arguments."""
     os.makedirs(path, exist_ok=True)
@@ -128,14 +157,16 @@ def save_image_info(image, path = './outputs/'):
     seed = image.argument['seed']
     filename = f'{cur_time}_SEED_{seed}'
     pnginfo_data = PngImagePlugin.PngInfo()
+    info_text = serialize_png_info(image.argument)
+    pnginfo_data.add_text('parameters', info_text)
     with open(os.path.join(path, filename + '.txt'), 'w') as f:
-        for key, value in image.argument.items():
-            f.write(f'{key}: {value}\n')
-            pnginfo_data.add_text(key, str(value))
-    image.save(os.path.join(path, filename + '.png'), 
+        f.write(info_text)
+    image_path = os.path.join(path, filename + '.png')
+    image.save(image_path, 
         quality=100,
         pnginfo=pnginfo_data
     )
+    return image_path
     
 def ReadImage(image, height = None, width = None):
     """
@@ -296,12 +327,12 @@ class StableDiffusionFriendlyPipeline():
             self.pipe.unet         = self.pipe.unet.to(dtype = dtype)
             self.pipe.vae          = self.pipe.vae.to(dtype = dtype)
             empty_cache()
-
-
+    
     def run(self, opt, task = 'txt2img'):
         # TODO junnyu 是否切换权重
         # runwayml/stable-diffusion-v1-5
-        self.from_pretrained(model_name=opt.model_name)
+        model_name = try_get_catched_model(opt.model_name)
+        self.from_pretrained(model_name=model_name)
         self.load_concepts(opt)
         self.to(dtype = opt.fp16) 
 
@@ -392,12 +423,19 @@ class StableDiffusionFriendlyPipeline():
 
                 image.argument['model_name'] = opt.model_name
 
-                save_image_info(image, opt.output_dir)
+                image_path = save_image_info(image, opt.output_dir)
                 if i % 5 == 0:
                     clear_output()
-
-                display(image)
-                print('Seed =', image.argument['seed'], 
+                
+                try:
+                    import ipywidgets as widgets
+                    with open(image_path,'rb') as file:
+                        data = file.read()
+                    display(widgets.Image(value = data))
+                except:
+                    display(image)
+                
+                print('Seed = ', image.argument['seed'], 
                     '    (%d / %d ... %.2f%%)'%(i + 1, opt.num_return_images, (i + 1.) / opt.num_return_images * 100))
 
 class SuperResolutionPipeline():
