@@ -160,7 +160,7 @@ def save_image_info(image, path = './outputs/'):
     info_text = serialize_png_info(image.argument)
     pnginfo_data.add_text('parameters', info_text)
     with open(os.path.join(path, filename + '.txt'), 'w') as f:
-        f.write(info_text)
+        f.write('Prompt: '+ info_text)
     image_path = os.path.join(path, filename + '.png')
     image.save(image_path, 
         quality=100,
@@ -328,7 +328,7 @@ class StableDiffusionFriendlyPipeline():
             self.pipe.vae          = self.pipe.vae.to(dtype = dtype)
             empty_cache()
     
-    def run(self, opt, task = 'txt2img'):
+    def run(self, opt, task = 'txt2img', on_image_generated = None):
         # TODO junnyu 是否切换权重
         # runwayml/stable-diffusion-v1-5
         model_name = try_get_catched_model(opt.model_name)
@@ -422,18 +422,22 @@ class StableDiffusionFriendlyPipeline():
                         
 
                 image.argument['model_name'] = opt.model_name
-
-                image_path = save_image_info(image, opt.output_dir)
+                
+                if on_image_generated is not None:
+                    on_image_generated(
+                        image = image,
+                        options = opt,
+                        count = i,
+                        total = opt.num_return_images
+                    )
+                    continue
+                    
+                save_image_info(image, opt.output_dir)
+                
                 if i % 5 == 0:
                     clear_output()
                 
-                try:
-                    import ipywidgets as widgets
-                    with open(image_path,'rb') as file:
-                        data = file.read()
-                    display(widgets.Image(value = data))
-                except:
-                    display(image)
+                display(image)
                 
                 print('Seed = ', image.argument['seed'], 
                     '    (%d / %d ... %.2f%%)'%(i + 1, opt.num_return_images, (i + 1.) / opt.num_return_images * 100))

@@ -63,8 +63,26 @@ class StableDiffusionUI():
     def on_run_button_click(self, b):
         with self.run_button_out:
             clear_output()
-            self.pipeline.run(get_widget_extractor(self.widget_opt), task = self.task)
+            self.pipeline.run(
+                get_widget_extractor(self.widget_opt), 
+                task = self.task,
+                on_image_generated = self.on_image_generated
+            )
     
+    def on_image_generated(self, image, options, count, total):
+        image_path = save_image_info(image, options.output_dir)
+        if count % 5 == 0:
+            clear_output()
+        
+        try:
+            with open(image_path,'rb') as file:
+                data = file.read()
+            display(widgets.Image(value = data))    # 使显示的图片包含嵌入信息
+        except:
+            display(image)
+        
+        print('Seed = ', image.argument['seed'], 
+            '    (%d / %d ... %.2f%%)'%(i + 1, total, (count + 1.) / total * 100))
 
 
 ####################################################################

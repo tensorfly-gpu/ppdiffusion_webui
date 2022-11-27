@@ -1,3 +1,5 @@
+from datetime import datetime
+import shutil
 from .ui import StableDiffusionUI
 
 import ipywidgets as widgets
@@ -53,6 +55,11 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
     .StableDiffusionUI_txt2img .box_wrap_quikbtns>button {
         padding: 0 !important;
     }
+    .StableDiffusionUI_txt2img button.run_button, 
+    .StableDiffusionUI_txt2img button.collect_button {
+        width: 45% !important;
+    }
+    
 }
 </style>
 '''
@@ -209,14 +216,40 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         
         
         self.run_button = widgets.Button(
-            description='点击生成图片！',
+            # description='点击生成图片！',
+            description='生成图片！',
             disabled=False,
             button_style='success', # 'success', 'info', 'warning', 'danger' or ''
             tooltip='点击运行（配置将自动更新）',
             icon='check'
         )
+        self.run_button.add_class('run_button')
         
         self.run_button.on_click(self.on_run_button_click)
+        
+        collect_button = widgets.Button(
+            description='收藏图片',
+            disabled=True,
+            button_style='info', # 'success', 'info', 'warning', 'danger' or ''
+            tooltip='将图片转移到Favorates文件夹中',
+            icon='star-o'
+        )
+        collect_button.add_class('collect_button')
+        self._output_collections = []
+        def collect_images(b):
+            dir = datetime.now().strftime('./Favorates/txt2img-%m%d/') 
+            os.makedirs(dir, exist_ok=True)
+            
+            for file in self._output_collections:
+                if os.path.isfile(file):
+                    shutil.move(file, dir)
+                file = file[:-4] + '.txt'
+                if os.path.isfile(file):
+                    shutil.move(file, dir)
+            self._output_collections.clear()
+            
+        collect_button.on_click(collect_images)
+        
         
         box_width_height = HBox([
                                     widget_opt['width'],
@@ -260,9 +293,46 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
                     align_items = "center",
                     max_width = '100%',
                 )),
-                self.run_button, 
+                self.run_button, collect_button,
                 self.run_button_out
             ], layout = Layout(display="block",margin="0 45px 0 0")
         )
         self.gui.add_class('StableDiffusionUI_txt2img')
+    
+    def on_run_button_click(self, b):
+        options = {}
+        for k in self.widget_opt:
+            options[k] = self.widget_opt[k].value
+            
+        self._output_collections.clear()
+        self.run_button.disabled = True
+        
+        try:
+            with self.run_button_out:
+                clear_output()
+                self.pipeline.run(
+                    options, 
+                    task = self.task,
+                    on_image_generated = self.on_image_generated
+                )
+        finally:
+            self.run_button.disabled = False
+           
+           
+    def on_image_generated(self, image, options, count, total):
+        image_path = save_image_info(image, options.output_dir)
+        self._output_collections.append(image_path)
+        
+        if count % 5 == 0:
+            clear_output()
+        
+        try:
+            with open(image_path,'rb') as file:
+                data = file.read()
+            display(widgets.Image(value = data))    # 使显示的图片包含嵌入信息
+        except:
+            display(image)
+        
+        print('Seed = ', image.argument['seed'], 
+            '    (%d / %d ... %.2f%%)'%(i + 1, total, (count + 1.) / total * 100))
 
