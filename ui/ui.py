@@ -4,16 +4,17 @@
 import os
 from IPython.display import clear_output
 
-from utils import diffusers_auto_update
+from .utils import diffusers_auto_update
 diffusers_auto_update(hint_kernel_restart = True)
 
 #from tqdm.auto import tqdm
 import paddle
 
-from textual_inversion import parse_args as textual_inversion_parse_args
-from textual_inversion import main as textual_inversion_main
-from utils import StableDiffusionFriendlyPipeline, SuperResolutionPipeline, diffusers_auto_update
-from utils import compute_gpu_memory, empty_cache
+from .textual_inversion import parse_args as textual_inversion_parse_args
+from .textual_inversion import main as textual_inversion_main
+from .utils import StableDiffusionFriendlyPipeline, SuperResolutionPipeline, diffusers_auto_update
+from .utils import compute_gpu_memory, empty_cache
+from .utils import save_image_info
 
 #_ENABLE_ENHANCE = False
 

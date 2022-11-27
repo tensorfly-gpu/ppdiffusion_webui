@@ -2,7 +2,7 @@ from .ui import StableDiffusionUI
 
 import ipywidgets as widgets
 from ipywidgets import Layout,HBox,VBox,Box
-import views
+from . import views
 
 class StableDiffusionUI_txt2img(StableDiffusionUI):
     def __init__(self):
