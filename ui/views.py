@@ -8,6 +8,10 @@ from ipywidgets import (
     Dropdown,
     Combobox,
     Layout,
+    Button,
+    Label,
+    
+    Box, HBox, VBox,
 )
 
 _DefaultLayout = {
@@ -25,19 +29,23 @@ _DefaultLayout = {
         'margin':  "0.5em",
         'align_items':  "center"
     },
+    'xs-flexwrap': {}, #未实现
 }
 
 # 为工具设置布局，并标记dom class
 def setLayout(layout_name, widget):
-    if layout_name not in _DefaultLayout: 
-        raise Exception(f'未定义的layout名称：{layout_name}')
+    _lists = layout_name if isinstance(layout_name, list) else [layout_name]
     
-    styles = _DefaultLayout[layout_name];
-    
-    for key in styles:
-        setattr(widget.layout, key, styles[key])
-    
-    widget.add_class(layout_name)
+    for name in _lists:
+        if layout_name not in _DefaultLayout: 
+            raise Exception(f'未定义的layout名称：{layout_name}')
+        
+        styles = _DefaultLayout[layout_name];
+        
+        for key in styles:
+            setattr(widget.layout, key, styles[key])
+        
+        widget.add_class(layout_name)
     
 _description_style = { 'description_width': "4rem" }
 _Views = {
@@ -205,6 +213,35 @@ _Views = {
         "options": ['CompVis/stable-diffusion-v1-4', 'runwayml/stable-diffusion-v1-5', 'hakurei/waifu-diffusion', 'hakurei/waifu-diffusion-v1-3', 'naclbit/trinart_stable_diffusion_v2_60k', 'naclbit/trinart_stable_diffusion_v2_95k', 'naclbit/trinart_stable_diffusion_v2_115k', 'MoososCap/NOVEL-MODEL', 'IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1', 'IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1', 'ruisi/anything'],
         "ensure_option": False,
     },
+    
+    # Button
+    "run_button": {
+        "__type": 'Button',
+        "class_name": 'run_button',
+        "button_style": 'success', # 'success', 'info', 'warning', 'danger' or ''
+        "description": '生成图片！',
+        "tooltip": '单击开始生成图片',
+        "icon": 'check'
+    },
+    
+    # Box
+    "box_gui": {
+        "__type": 'Box',
+        "layout": {
+            "display": 'block',
+            "margin": '0 45px 0 0',
+        },
+    },
+    "box_main": {
+        "__type": 'Box',
+        "layout": {
+            "display": 'flex',
+            "flex_flow": 'row wrap', #HBox会覆写此属性
+            "align_items": 'center',
+            "max_width": '100%',
+        },
+    },
+    
 }
     
 def _mergeViewOptions(defaultOpt,kwargs):
@@ -231,7 +268,7 @@ def _mergeViewOptions(defaultOpt,kwargs):
 
     
     
-def createView(name, **kwargs):
+def createView(name, value = None, **kwargs):
     if name not in _Views:
         raise Exception(f'未定义的View名称 {name}')
     if '__type' not in _Views[name]:
@@ -239,6 +276,7 @@ def createView(name, **kwargs):
     
     # 合并参数
     options = _mergeViewOptions(_Views[name], kwargs)
+    if value is not None: options['value'] = value
     
     # 创建实例
     widget = None
@@ -257,8 +295,20 @@ def createView(name, **kwargs):
         widget = Dropdown(**options)
     elif __type == 'Combobox':
         widget = Combobox(**options)
+    elif __type == 'Button':
+        widget = Button(**options)
+    elif __type == 'Label':
+        widget = Label(**options)
     else:
-        raise Exception(f'View {name} 定义的类型{__type}未实现')
+        if value is not None: options['children'] = value #有没有同时要value和children的部件？
+        if __type == 'Box':
+            widget = Box(**options)
+        elif __type == 'HBox':
+            widget = HBox(**options)
+        elif __type == 'VBox':
+            widget = VBox(**options)
+        else:
+            raise Exception(f'View {name} 定义的类型{__type}未实现')
     
     # 添加DOM class名
     if 'class_name' in options:
@@ -269,6 +319,145 @@ def createView(name, **kwargs):
     
     return widget
 
+DEFAULT_BADWORDS = "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry"
+def createPromptsView(value = '', negative_value = ''):
+
+    style_sheets = '''
+@media (max-width:576px) {
+    {root} .box_prompts .prompt > textarea {
+        min-height:10em;
+        margin-left:2rem!important;
+    }
+    {root} .box_prompts .negative_prompt > textarea {
+        margin-left:2rem!important;
+    }
+    {root} .box_prompts > .box_wrap_quikbtns {
+        margin-left: 0 !important;
+    }
+    {root} .box_prompts > .box_wrap_quikbtns > button {
+        padding: 0 !important;
+    }
+}
+'''
     
+    prompt = createView('prompt', value = value)
+        
+    negative_prompt = createView('negative_prompt', value = negative_value) 
     
+    # 按钮
+    btnGoodQuality = Button(
+        description= '',
+        tooltip='填充标准质量描述',
+        icon='palette',
+        layout = Layout(
+            position = 'absolute',
+            height = '1.8rem',
+            width = '1.8rem',
+            margin = '-11rem 0 0 0'
+        )
+    )
+    btnBadwards = Button(
+        description= '',
+        tooltip='填充标准负面描述',
+        icon='paper-plane',
+        layout = Layout(
+            position = 'absolute',
+            height = '1.8rem',
+            width = '1.8rem',
+            margin = '-2rem 0px 0rem -1.8rem'
+        )
+    )
+    def fill_good_quality(b):
+        if not prompt.value.startswith('masterpiece,best quality,'):
+            prompt.value = 'masterpiece,best quality,' + prompt.value
+    def fill_bad_words(b):
+        negative_prompt.value = DEFAULT_BADWORDS
+        
+    btnGoodQuality.on_click(fill_good_quality)
+    btnBadwards.on_click(fill_bad_words)
+        
+    box_wrap_quikbtns = Box([
+                            btnGoodQuality,btnBadwards,
+                        ], layout = Layout(
+                            margin = '0 1rem',
+                            height = '0',
+                            overflow = 'visible'
+                        ));
+    box_wrap_quikbtns.add_class('box_wrap_quikbtns')
+    
+    container = Box([
+        HBox([prompt]),
+        HBox([negative_prompt]),
+        box_wrap_quikbtns,
+    ])
+    container.layout.display = 'block';
+    container.add_class('box_prompts')
+    
+    return {
+        'container': container,
+        'prompt': prompt,
+        'negative_prompt': negative_prompt,
+        'style_sheets': style_sheets,
+    }
+    
+
+def createWidthHeightView(width_value = 512, height_value = 512, step64 = False):
+    style_sheets = '''
+@media (max-width:576px) {
+    {root} .box_width_height {
+        flex: 8 8 60% !important;
+    }
+}
+'''
+    w_width = BoundedIntText(
+        layout=Layout(
+            flex = '1 0 2em'
+        ),
+        value=width_value,
+        min=64,
+        max=1024,
+        step=64,
+    )
+    w_height = BoundedIntText(
+        layout=w_width.layout,
+        value=height_value,
+        min=64,
+        max=1024,
+        step=64,
+    )
+    
+    if step64:
+        def validate(change):
+            num = change.new % 64
+            if change.new < 64:
+                change.owner.value = 64
+            elif num == 0:
+                pass
+            elif num < 32:
+                change.owner.value = change.new - num
+            else:
+                change.owner.value = change.new - num + 64
+        w_width.observe(validate,names = 'value')
+        w_height.observe(validate,names = 'value')
+        
+    container = HBox([
+        w_width,
+        Label(
+            value='X',
+            layout = Layout(
+                flex='0 0 auto',
+                padding='0 1em'
+            )
+        ),
+        w_height,
+    ])
+    setLayout('col04', container)
+    container.add_class('box_width_height')
+    
+    return {
+        'container': container,
+        'width': w_width,
+        'height': w_height,
+        'style_sheets': style_sheets,
+    }
     
