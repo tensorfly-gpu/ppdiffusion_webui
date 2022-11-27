@@ -29,6 +29,12 @@ _DefaultLayout = {
         'margin':  "0.5em",
         'align_items':  "center"
     },
+    'col12': {
+        'flex':  "12 12 90%",
+        'max_width':  "100%",
+        'margin':  "0.5em",
+        'align_items':  "center"
+    },
     'xs-flexwrap': {}, #未实现
 }
 
@@ -81,6 +87,7 @@ _Views = {
     # Text
     "concepts_library_dir": {
         "__type": 'Text',
+        "class_name": 'concepts_library_dir',
         "layout_name": 'col08',
         "style": _description_style,
         "description": '风格权重',
@@ -89,6 +96,7 @@ _Views = {
     },
     "output_dir": {
         "__type": 'Text',
+        "class_name": 'output_dir',
         "layout_name": 'col08',
         "style": _description_style,
         "description": '保存路径',
@@ -97,6 +105,7 @@ _Views = {
     },
     "seed": {
         "__type": 'IntText',
+        "class_name": 'seed',
         "layout_name": 'col04',
         "style": _description_style,
         "description": '随机种子',
@@ -105,6 +114,7 @@ _Views = {
     },
     "num_inference_steps": {
         "__type": 'BoundedIntText',
+        "class_name": 'num_inference_steps',
         "layout_name": 'col04',
         "style": _description_style,
         "description": '推理步数',
@@ -115,6 +125,7 @@ _Views = {
     },
     "num_return_images": {
         "__type": 'BoundedIntText',
+        "class_name": 'num_return_images',
         "layout_name": 'col04',
         "style": _description_style,
         "description": '生成数量',
@@ -126,18 +137,20 @@ _Views = {
     },
     "guidance_scale": {
         "__type": 'BoundedFloatText',
+        "class_name": 'guidance_scale',
         "layout_name": 'col04',
         "style": _description_style,
         "description": 'CFG',
         "description_tooltip": '引导度（CFG Scale）：控制图片与描述词之间的相关程度。',
         "min": 0,
-        "max": 100,
+        "max": 50,
         "value": 7.5,
     },
     
     # Dropdown 
     "enable_parsing": {
         "__type": 'Dropdown',
+        "class_name": 'enable_parsing',
         "layout_name": 'col04',
         "style": _description_style,
         "description": '括号格式',
@@ -147,6 +160,7 @@ _Views = {
     },
     "fp16": {
         "__type": 'Dropdown',
+        "class_name": 'fp16',
         "layout_name": 'col04',
         "style": _description_style,
         "description": '算术精度',
@@ -156,6 +170,7 @@ _Views = {
     },
     "max_embeddings_multiples": {
         "__type": 'Dropdown',
+        "class_name": 'max_embeddings_multiples',
         "layout_name": 'col04',
         "style": _description_style,
         "description": '描述上限',
@@ -165,6 +180,7 @@ _Views = {
     },
     "sampler": {
         "__type": 'Dropdown',
+        "class_name": 'sampler',
         "layout_name": 'col04',
         "style": _description_style,
         "description": '采样器',
@@ -205,6 +221,7 @@ _Views = {
     # Combobox 
     "model_name": {
         "__type": 'Combobox',
+        "class_name": 'model_name',
         "layout_name": 'col08',
         "style": _description_style,
         "description": '模型名称',
@@ -243,6 +260,31 @@ _Views = {
     },
     
 }
+
+SHARED_STYLE_SHEETS = '''
+@media (max-width:576px) {
+    {root} {
+        margin-right: 0 !important;
+    }
+    {root} .widget-text,
+    {root} .widget-dropdown,
+    {root} .widget-hslider,
+    {root} .widget-textarea {
+        flex-wrap: wrap !important;
+        height: auto;
+        margin-top: 0.1rem !important;
+        margin-bottom: 0.1rem !important;
+    }
+    {root} .widget-text > label,
+    {root} .widget-dropdown > label,
+    {root} .widget-hslider > label,
+    {root} .widget-textarea > label {
+        width: 100% !important;
+        text-align: left !important;
+        font-size: small !important;
+    }
+}
+'''
     
 def _mergeViewOptions(defaultOpt,kwargs):
     r = {}
@@ -409,21 +451,30 @@ def createWidthHeightView(width_value = 512, height_value = 512, step64 = False)
     }
 }
 '''
+    _layout = Layout(
+            flex = '1 0 2em',
+            width = '33%',
+        )
+        
     w_width = BoundedIntText(
-        layout=Layout(
-            flex = '1 0 2em'
-        ),
+        layout=_layout,
         value=width_value,
         min=64,
         max=1024,
         step=64,
+    ) if not step64 else IntText(
+        layout=_layout,
+        value=width_value,
     )
     w_height = BoundedIntText(
-        layout=w_width.layout,
+        layout=_layout,
         value=height_value,
         min=64,
         max=1024,
         step=64,
+    ) if not step64 else IntText(
+        layout=_layout,
+        value=height_value,
     )
     
     if step64:
@@ -443,11 +494,12 @@ def createWidthHeightView(width_value = 512, height_value = 512, step64 = False)
     container = HBox([
         w_width,
         Label(
-            value='X',
+            value = 'X',
             layout = Layout(
                 flex='0 0 auto',
                 padding='0 1em'
-            )
+            ),
+           # description_tooltip = '图片尺寸' if not step64 else '图片尺寸（-1为自动判断）'
         ),
         w_height,
     ])

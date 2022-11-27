@@ -12,41 +12,17 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         CLASS_NAME = self.__class__.__name__
         
         STYLE_SHEETS = '''
-
 @media (max-width:576px) {
-    {root} {
-        margin-right: 0 !important;
-    }
-    
-    {root} .widget-text,
-    {root} .widget-dropdown,
-    {root} .widget-textarea {
-        flex-wrap: wrap !important;
-        height: auto;
-        margin-top: 0.1rem !important;
-        margin-bottom: 0.1rem !important;
-    }
-    {root} .widget-text > label,
-    {root} .widget-dropdown > label,
-    {root} .widget-textarea > label {
-        width: 100% !important;
-        text-align: left !important;
-        font-size: small !important;
-    }
-    
     {root} .standard_size,
     {root} .superres_model_name {
         order: -1;
     }
     
-    
     {root} button.run_button, 
     {root} button.collect_button {
         width: 45% !important;
     }
-    
 }
-
 '''
         
         #默认参数
@@ -146,11 +122,13 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         collect_button.on_click(collect_images)
         
         # 样式表
-        STYLE_SHEETS += view_prompts['style_sheets']
-        STYLE_SHEETS += view_width_height['style_sheets']
-        STYLE_SHEETS = '<style>' \
-            + STYLE_SHEETS.replace('{root}', '.' + CLASS_NAME) \
-            + '</style>'
+        STYLE_SHEETS = ('<style>' \
+                + views.SHARED_STYLE_SHEETS \
+                + STYLE_SHEETS \
+                + view_prompts['style_sheets'] \
+                + view_width_height['style_sheets'] \
+                + '</style>'
+            ).replace('{root}', '.' + CLASS_NAME)
         
         #
         self.gui = views.createView("box_gui", 
@@ -181,21 +159,11 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         )
     
     def on_run_button_click(self, b):
-        options = {}
-        for k in self.widget_opt:
-            options[k] = self.widget_opt[k].value
-            
         self._output_collections.clear()
         self.run_button.disabled = True
         
         try:
-            with self.run_button_out:
-                clear_output()
-                self.pipeline.run(
-                    options, 
-                    task = self.task,
-                    on_image_generated = self.on_image_generated
-                )
+            super().on_run_button_click()
         finally:
             self.run_button.disabled = False
            
