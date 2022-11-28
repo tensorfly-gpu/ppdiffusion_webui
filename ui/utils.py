@@ -21,7 +21,7 @@ def empty_cache():
     """Empty CUDA cache. Essential in stable diffusion pipeline."""
     import gc
     gc.collect()
-    paddle.device.cuda.empty_cache()
+    # paddle.device.cuda.empty_cache()
 
 def check_is_model_complete(path = None, check_vae_size=_VAE_SIZE_THRESHOLD_):
     """Auto check whether a model is complete by checking the size of vae > check_vae_size.
@@ -74,9 +74,9 @@ def model_unzip(abs_path = None, name = None, dest_path = './', verbose = True):
         print('模型已存在')
 
 def package_install(verbose = True, dev_paddle = False):
-    # if (not os.path.exists('resources')) and os.path.exists('resources.zip'):
-    #     os.system("unzip resources.zip")
-    #     clear_output()
+    if (not os.path.exists('ppdiffusers')) and os.path.exists('ppdiffusers.zip'):
+        os.system("unzip ppdiffusers.zip")
+        clear_output()
     
     # if os.path.exists('resources/Alice.pdparams') and\
     #  (not os.path.exists('outputs/textual_inversion/Alice.pdparams')):
@@ -85,9 +85,9 @@ def package_install(verbose = True, dev_paddle = False):
     try:
         from paddlenlp.utils.tools import compare_version
         import ppdiffusers
-        if compare_version(ppdiffusers.__version__, "0.6.1") < 0:
-            if ppdiffusers.__version__ != "0.0.0":
-                os.system("pip install -U ppdiffusers --user")
+        # if compare_version(ppdiffusers.__version__, "0.6.1") < 0:
+            # if ppdiffusers.__version__ != "0.0.0":
+                # os.system("pip install -U ppdiffusers --user")
         from paddlenlp.transformers.clip.feature_extraction import CLIPFeatureExtractor
         from paddlenlp.transformers import FeatureExtractionMixin
         
@@ -96,7 +96,7 @@ def package_install(verbose = True, dev_paddle = False):
         os.system("pip install --upgrade pip  -i https://mirror.baidu.com/pypi/simple")
         os.system("pip install -U ppdiffusers --user")
         # os.system("pip install --upgrade paddlenlp  -i https://mirror.baidu.com/pypi/simple")
-        os.system("pip install paddlenlp==2.4.1 --user")
+        os.system("pip install -U paddlenlp --user")
         clear_output()
 
     if dev_paddle:
@@ -231,7 +231,8 @@ class StableDiffusionFriendlyPipeline():
         with context_nologging():
             from ppdiffusers import StableDiffusionPipelineAllinOne
             self.pipe = StableDiffusionPipelineAllinOne.from_pretrained(model, safety_checker = None)
-
+            if self.pipe.tokenizer.model_max_length>100:
+                self.pipe.tokenizer.model_max_length = 77
         # # VAE
         # if vae is not None:
         #     # use better vae if provided
@@ -243,19 +244,32 @@ class StableDiffusionFriendlyPipeline():
         #         copy(model_vae_get_default(), local_vae) # copy from remote, avoid download everytime
 
         #     self.pipe.vae.load_dict(paddle.load(local_vae))
+        sdr = self.pipe.scheduler
 
+        self.available_schedulers = {}
+        self.available_schedulers['default'] = sdr
         # schedulers
-        if len(self.available_schedulers) == 0:
+        if len(self.available_schedulers) == 1:
             # register schedulers
-            from ppdiffusers import PNDMScheduler, DDIMScheduler, LMSDiscreteScheduler
+            from ppdiffusers import PNDMScheduler, DDIMScheduler, LMSDiscreteScheduler, EulerAncestralDiscreteScheduler, EulerDiscreteScheduler, DPMSolverMultistepScheduler
             # assume the current one is PNDM!!!
-            sdr: PNDMScheduler = self.pipe.scheduler
-            self.available_schedulers = {
+            self.available_schedulers.update({
+                "DPMSolver": DPMSolverMultistepScheduler.from_config(
+                    "CompVis/stable-diffusion-v1-4",  # or use the v1-5 version
+                    subfolder="scheduler",
+                    solver_order=2,
+                    predict_epsilon=True,
+                    thresholding=False,
+                    algorithm_type="dpmsolver++",
+                    solver_type="midpoint",
+                    denoise_final=True,  # the influence of this trick is effective for small (e.g. <=10) steps
+                ),
+                "EulerDiscrete": EulerDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"), 
+                'EulerAncestralDiscrete': EulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"), 
                 'PNDM': PNDMScheduler(beta_start=sdr.beta_start, beta_end=sdr.beta_end,  beta_schedule=sdr.beta_schedule, skip_prk_steps=True),
-                'DDIM': DDIMScheduler(beta_start=sdr.beta_start, beta_end=sdr.beta_end, beta_schedule=sdr.beta_schedule, num_train_timesteps=sdr.num_train_timesteps, clip_sample=False, set_alpha_to_one=sdr.set_alpha_to_one),
-                'LMS' : LMSDiscreteScheduler(beta_start=sdr.beta_start, beta_end=sdr.beta_end, beta_schedule=sdr.beta_schedule, num_train_timesteps=sdr.num_train_timesteps)
-            }
-
+                'DDIM': DDIMScheduler(beta_start=sdr.beta_start, beta_end=sdr.beta_end, beta_schedule=sdr.beta_schedule, num_train_timesteps=sdr.num_train_timesteps, clip_sample=False, set_alpha_to_one=sdr.set_alpha_to_one, steps_offset=1,),
+                'LMSDiscrete' : LMSDiscreteScheduler(beta_start=sdr.beta_start, beta_end=sdr.beta_end, beta_schedule=sdr.beta_schedule, num_train_timesteps=sdr.num_train_timesteps)
+            })
 
         if verbose: print('成功加载完毕, 若默认设置无法生成, 请停止项目等待保存完毕选择GPU重新进入')
 
@@ -289,8 +303,8 @@ class StableDiffusionFriendlyPipeline():
                         self.pipe.text_encoder.resize_token_embeddings(len(self.pipe.tokenizer))
                         token_id = self.pipe.tokenizer.convert_tokens_to_ids(token)
                         with paddle.no_grad():
-                            if paddle.max(paddle.abs(self.pipe.text_encoder.get_input_embeddings().weight[token_id] - embeds)) > 1e-4:
-                                # only add / update new token if it has changed
+                            #if paddle.max(paddle.abs(self.pipe.text_encoder.get_input_embeddings().weight[token_id] - embeds)) > 1e-4:
+                            #    # only add / update new token if it has changed
                                 has_updated = True
                                 self.pipe.text_encoder.get_input_embeddings().weight[token_id] = embeds
                         added_tokens.append(token)

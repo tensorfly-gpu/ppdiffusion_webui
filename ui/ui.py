@@ -2,6 +2,7 @@
 # Has modified
 
 import os
+os.environ['PPNLP_HOME'] = "./model_weights"
 from IPython.display import clear_output
 
 from .utils import diffusers_auto_update
@@ -116,7 +117,7 @@ class StableDiffusionTrainUI():
         args.unet         = self.pipeline.pipe.unet
         args.vae          = self.pipeline.pipe.vae
 
-        if compute_gpu_memory() <= 17.:
+        if compute_gpu_memory() <= 17. or args.height==768 or args.width==768:
             args.train_batch_size = 1
             args.gradient_accumulation_steps = 4
         else:
@@ -248,7 +249,14 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
             layout=layoutCol12, style=styleDescription,
             description='最大训练步数',
             description_tooltip='最大训练步数',
-            value=500,
+            value=1000,
+            step=100,
+            disabled=False
+        )
+        widget_opt['save_steps'] = widgets.IntText(
+            layout=layoutCol12, style=styleDescription,
+            description='每隔多少步保存模型',
+            value=200,
             step=100,
             disabled=False
         )
@@ -256,7 +264,24 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
             layout=layoutCol12, style=styleDescription,
             description='需要训练的模型名称',
             value="hakurei/waifu-diffusion-v1-3",
-            options=["CompVis/stable-diffusion-v1-4", "runwayml/stable-diffusion-v1-5", "hakurei/waifu-diffusion", "hakurei/waifu-diffusion-v1-3", "naclbit/trinart_stable_diffusion_v2_60k", "naclbit/trinart_stable_diffusion_v2_95k", "naclbit/trinart_stable_diffusion_v2_115k", "MoososCap/NOVEL-MODEL", "ruisi/anything"],
+            options=[
+                'CompVis/stable-diffusion-v1-4', 
+                'runwayml/stable-diffusion-v1-5', 
+                'stabilityai/stable-diffusion-2', 
+                'stabilityai/stable-diffusion-2-base', 
+                'hakurei/waifu-diffusion', 
+                'hakurei/waifu-diffusion-v1-3', 
+                'naclbit/trinart_stable_diffusion_v2_60k', 
+                'naclbit/trinart_stable_diffusion_v2_95k', 
+                'naclbit/trinart_stable_diffusion_v2_115k', 
+                'IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1', 
+                'IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1', 
+                'BAAI/AltDiffusion', 
+                'BAAI/AltDiffusion-m9',
+                'MoososCap/NOVEL-MODEL', 
+                'ruisi/anything',
+                'Linaqruf/anything-v3.0', 
+            ],
             ensure_option=False,
             disabled=False
         )
@@ -281,6 +306,7 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
                     widget_opt['repeats'],
                     widget_opt['learning_rate'],
                     widget_opt['max_train_steps'],
+                    widget_opt['save_steps'],
                     widget_opt['model_name'],
                     widget_opt['output_dir'],
                     
@@ -395,15 +421,40 @@ class StableDiffusionUI_text_inversion_prediction(StableDiffusionUI):
         widget_opt['sampler'] = widgets.Dropdown(
             layout=widgets.Layout(width='50%'), style=style,
             description='采样器' + '&nbsp;'*30,
-            value="DDIM",
-            options=["PNDM", "DDIM", "LMS"],
+            value='default',
+            options=[
+                'default', 
+                'DPMSolver',
+                'EulerDiscrete',
+                'EulerAncestralDiscrete', 
+                'PNDM', 
+                'DDIM', 
+                'LMSDiscrete',
+            ], 
             disabled=False
         )
         widget_opt['model_name'] = widgets.Dropdown(
             layout=layout, style=style,
             description='需要加载的模型名称',
             value="hakurei/waifu-diffusion-v1-3",
-            options=["CompVis/stable-diffusion-v1-4", "runwayml/stable-diffusion-v1-5", "hakurei/waifu-diffusion", "hakurei/waifu-diffusion-v1-3", "naclbit/trinart_stable_diffusion_v2_60k", "naclbit/trinart_stable_diffusion_v2_95k", "naclbit/trinart_stable_diffusion_v2_115k", "MoososCap/NOVEL-MODEL", "ruisi/anything"],
+            options=[
+                'CompVis/stable-diffusion-v1-4', 
+                'runwayml/stable-diffusion-v1-5', 
+                'stabilityai/stable-diffusion-2', 
+                'stabilityai/stable-diffusion-2-base', 
+                'hakurei/waifu-diffusion', 
+                'hakurei/waifu-diffusion-v1-3', 
+                'naclbit/trinart_stable_diffusion_v2_60k', 
+                'naclbit/trinart_stable_diffusion_v2_95k', 
+                'naclbit/trinart_stable_diffusion_v2_115k', 
+                'IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1', 
+                'IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1', 
+                'BAAI/AltDiffusion', 
+                'BAAI/AltDiffusion-m9',
+                'MoososCap/NOVEL-MODEL', 
+                'ruisi/anything',
+                'Linaqruf/anything-v3.0', 
+            ],
             disabled=False
         )
         widget_opt['superres_model_name'] = widgets.Dropdown(

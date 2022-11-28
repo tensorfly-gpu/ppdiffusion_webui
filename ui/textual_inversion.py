@@ -1,3 +1,81 @@
+import paddle
+from PIL import Image
+
+def image_grid(imgs, rows=2, cols=2):
+    imgs = imgs.astype("uint8")
+    imgs = [Image.fromarray(img) for img in imgs]
+    assert len(imgs) == rows * cols
+    w, h = imgs[0].size
+    grid = Image.new('RGB', size=(cols * w, rows * h))
+    for i, img in enumerate(imgs):
+        grid.paste(img, box=(i % cols * w, i // cols * h))
+    return grid
+    
+@paddle.no_grad()
+def log_image(
+                input_ids=None,
+                text_encoder=None,
+                tokenizer=None,
+                unet=None,
+                vae=None,
+                eval_scheduler=None,
+                height=512,
+                width=512,
+                guidance_scale=7.5,
+                **kwargs):
+    text_encoder.eval()
+    if height % 8 != 0 or width % 8 != 0:
+        raise ValueError(
+            f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
+        )
+    # only log 8 image
+    # if input_ids.shape[0] == 1:
+    #     input_ids = input_ids.tile([4, 1])
+
+    text_embeddings = text_encoder(input_ids)[0]
+    do_classifier_free_guidance = guidance_scale > 1.0
+    if do_classifier_free_guidance:
+        batch_size, max_length = input_ids.shape
+        uncond_input = tokenizer([""] * batch_size,
+                                        padding="max_length",
+                                        truncation=True,
+                                        max_length=max_length,
+                                        return_tensors="pd")
+        uncond_embeddings = text_encoder(uncond_input.input_ids)[0]
+        text_embeddings = paddle.concat(
+            [uncond_embeddings, text_embeddings], axis=0)
+
+    latents = paddle.randn((input_ids.shape[0], unet.in_channels,
+                            height // 8, width // 8))
+    # ddim donot use this
+    latents = latents * eval_scheduler.init_noise_sigma
+
+    for t in eval_scheduler.timesteps:
+        # expand the latents if we are doing classifier free guidance
+        latent_model_input = paddle.concat(
+            [latents] * 2) if do_classifier_free_guidance else latents
+        # ddim donot use this
+        latent_model_input = eval_scheduler.scale_model_input(
+            latent_model_input, t)
+
+        # predict the noise residual
+        noise_pred = unet(latent_model_input,
+                                t,
+                                encoder_hidden_states=text_embeddings).sample
+        # perform guidance
+        if do_classifier_free_guidance:
+            noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + guidance_scale * (
+                noise_pred_text - noise_pred_uncond)
+        # compute the previous noisy sample x_t -> x_t-1
+        latents = eval_scheduler.step(noise_pred, t, latents).prev_sample
+
+    latents = 1 / 0.18215 * latents
+    image = vae.decode(latents).sample
+    image = (image / 2 + 0.5).clip(0, 1).transpose([0, 2, 3, 1]) * 255.
+    text_encoder.train()
+    return image.numpy().round()
+
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 The HuggingFace Team. All rights reserved.
 #
@@ -77,11 +155,12 @@ def save_progress(text_encoder, placeholder_token_id, args, global_step=-1):
         62: 95,
         124: 95
     })
-
+    path = os.path.join(args.output_dir, "step-"+str(global_step))
+    os.makedirs(path, exist_ok=True)
     paddle.save(learned_embeds_dict,
-                os.path.join(args.output_dir, f"{name}.pdparams"))
+                os.path.join(args.output_dir, "step-"+str(global_step), f"{name}.pdparams"))
     print(
-        f"Global_step: {global_step} 训练好的文件已经保存到{args.output_dir}目录下!")
+        f"Global_step: {global_step} 程序没有卡住，目前正在生成评估图片，请耐心等待！训练好的权重和评估图片将会自动保存到 {path} 目录下。")
 
 
 def parse_args():
@@ -90,7 +169,7 @@ def parse_args():
     parser.add_argument(
         "--save_steps",
         type=int,
-        default=100,
+        default=10,
         help="Save learned_embeds.pdparams every X updates steps.",
     )
     parser.add_argument(
@@ -300,6 +379,7 @@ imagenet_style_templates_small = [
 ]
 
 
+
 class TextualInversionDataset(Dataset):
 
     def __init__(
@@ -367,6 +447,14 @@ class TextualInversionDataset(Dataset):
             max_length=self.tokenizer.model_max_length,
         ).input_ids
 
+
+        example["input_ids_eval"] = self.tokenizer(
+            placeholder_string,
+            padding="do_not_pad",
+            truncation=True,
+            max_length=self.tokenizer.model_max_length,
+        ).input_ids
+        
         # default to score-sde preprocessing
         img = np.array(image).astype(np.uint8)
 
@@ -459,6 +547,8 @@ def main(args):
     # Resize the token embeddings as we are adding new special tokens to the tokenizer
     text_encoder.resize_token_embeddings(len(tokenizer))
 
+    eval_scheduler = PNDMScheduler(beta_start=0.00085, beta_end=0.012,  beta_schedule='scaled_linear', skip_prk_steps=True)
+    eval_scheduler.set_timesteps(50)
     # Initialise the newly added placeholder token with the embeddings of the initializer token
     with paddle.no_grad():
         token_embeds = text_encoder.get_input_embeddings()
@@ -523,16 +613,23 @@ def main(args):
 
     def collate_fn(examples):
         input_ids = [example["input_ids"] for example in examples]
+        input_ids_eval = [example["input_ids_eval"] for example in examples]
         pixel_values = paddle.to_tensor(
             [example["pixel_values"] for example in examples], dtype="float32")
         input_ids = tokenizer.pad({
             "input_ids": input_ids
         },
-                                  padding=True,
+                                  padding="max_length", max_length=tokenizer.model_max_length,
+                                  return_tensors="pd").input_ids
+        input_ids_eval = tokenizer.pad({
+            "input_ids": input_ids_eval
+        },
+                                  padding="max_length", max_length=tokenizer.model_max_length,
                                   return_tensors="pd").input_ids
         batch = {
             "input_ids": input_ids,
             "pixel_values": pixel_values,
+            "input_ids_eval": input_ids_eval,
         }
         return batch
 
@@ -664,10 +761,40 @@ def main(args):
                             writer.add_scalar(f"train/{name}",
                                               val,
                                               step=global_step)
-
                         if global_step % args.save_steps == 0:
                             save_progress(text_encoder, placeholder_token_id,
                                           args, global_step)
+                            all_images = []
+                            loop = 4 if batch["input_ids_eval"].shape[0] == 1 else 1
+                            for i in range(loop):
+                                img = log_image(batch["input_ids_eval"], 
+                                                tokenizer=tokenizer,
+                                                vae = unwrap_model(vae),
+                                                eval_scheduler=eval_scheduler,
+                                                text_encoder=unwrap_model(text_encoder), 
+                                                unet=unwrap_model(unet))
+                                all_images.append(img)
+                            if len(all_images) > 1:
+                                all_images = np.concatenate(all_images, axis=0)
+                            else:
+                                all_images = all_images[0]
+                            writer.add_image("images", all_images,
+                                                    step=global_step,
+                                                    dataformats="NHWC")
+                            name = args.placeholder_token
+                            name = name.translate({
+                                92: 95,
+                                47: 95,
+                                42: 95,
+                                34: 95,
+                                58: 95,
+                                63: 95,
+                                60: 95,
+                                62: 95,
+                                124: 95
+                            })
+                            image_grid(all_images).save(os.path.join(args.output_dir, "step-"+str(global_step), f"{name}.jpg"))
+
 
                 if global_step >= args.max_train_steps:
                     break
