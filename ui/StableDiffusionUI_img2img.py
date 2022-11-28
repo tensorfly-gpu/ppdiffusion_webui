@@ -65,7 +65,6 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
         view_width_height = views.createWidthHeightView(
             width_value = args['width'], 
             height_value = args['width'], 
-            step64 = True,
         )
         widget_opt['width'] = view_width_height['width']
         widget_opt['height'] = view_width_height['height']
@@ -161,8 +160,8 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
         STYLE_SHEETS = ('<style>' \
                 + views.SHARED_STYLE_SHEETS \
                 + STYLE_SHEETS \
-                + view_prompts['style_sheets'] \
-                + view_width_height['style_sheets'] \
+                + view_prompts.style_sheets \
+                + view_width_height.style_sheets \
                 + '</style>'
             ).replace('{root}', '.' + CLASS_NAME)
         
@@ -171,11 +170,11 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
             class_name = CLASS_NAME,
             children = [
                 widgets.HTML(STYLE_SHEETS),
-                view_prompts['container'],
+                view_prompts.container,
                 views.createView("box_main", 
                 [
                     widget_opt['image_path'],
-                    view_width_height['container'],
+                    view_width_height.container,
                     widget_opt['superres_model_name'],
                     
                     widget_opt['strength'],

@@ -1,4 +1,5 @@
 
+from traitlets import Bunch
 from ipywidgets import (
     Textarea,
     Text,
@@ -435,15 +436,14 @@ def createPromptsView(value = '', negative_value = ''):
     container.layout.display = 'block';
     container.add_class('box_prompts')
     
-    return {
+    return Bunch({
         'container': container,
         'prompt': prompt,
         'negative_prompt': negative_prompt,
         'style_sheets': style_sheets,
-    }
+    })
     
-
-def createWidthHeightView(width_value = 512, height_value = 512, step64 = False):
+def _create_WHView(width_value = 512, height_value = 512):
     style_sheets = '''
 @media (max-width:576px) {
     {root} .box_width_height {
@@ -452,19 +452,15 @@ def createWidthHeightView(width_value = 512, height_value = 512, step64 = False)
 }
 '''
     _layout = Layout(
-            flex = '1 0 2em',
-            width = '33%',
-        )
-        
+        flex = '1 0 2em',
+        width = '2em',
+    )
     w_width = BoundedIntText(
         layout=_layout,
         value=width_value,
         min=64,
         max=1024,
         step=64,
-    ) if not step64 else IntText(
-        layout=_layout,
-        value=width_value,
     )
     w_height = BoundedIntText(
         layout=_layout,
@@ -472,24 +468,20 @@ def createWidthHeightView(width_value = 512, height_value = 512, step64 = False)
         min=64,
         max=1024,
         step=64,
-    ) if not step64 else IntText(
-        layout=_layout,
-        value=height_value,
     )
     
-    if step64:
-        def validate(change):
-            num = change.new % 64
-            if change.new < 64:
-                change.owner.value = 64
-            elif num == 0:
-                pass
-            elif num < 32:
-                change.owner.value = change.new - num
-            else:
-                change.owner.value = change.new - num + 64
-        w_width.observe(validate,names = 'value')
-        w_height.observe(validate,names = 'value')
+    def validate(change):
+        num = change.new % 64
+        if change.new < 64:
+            change.owner.value = 64
+        elif num == 0:
+            pass
+        elif num < 32:
+            change.owner.value = change.new - num
+        else:
+            change.owner.value = change.new - num + 64
+    w_width.observe(validate,names = 'value')
+    w_height.observe(validate,names = 'value')
         
     container = HBox([
         w_width,
@@ -506,10 +498,80 @@ def createWidthHeightView(width_value = 512, height_value = 512, step64 = False)
     setLayout('col04', container)
     container.add_class('box_width_height')
     
-    return {
+    return Bunch({
         'container': container,
         'width': w_width,
         'height': w_height,
         'style_sheets': style_sheets,
-    }
+    })
     
+def _create_WHView_for_img2img(width_value = -1, height_value = -1):
+    style_sheets = '''
+{root} .box_width_height > .widget-label {
+    text-align: right !important;
+}
+@media (max-width:576px) {
+    {root} .box_width_height {
+        flex: 8 8 60% !important;
+        
+        flex-wrap: wrap !important;
+        height: auto;
+        margin-top: 0.1rem !important;
+        margin-bottom: 0.1rem !important;
+    }
+    {root} .box_width_height > .widget-label {
+        width: 100% !important;
+        text-align: left !important;
+        font-size: small !important;
+    }
+}
+'''
+    _layout = Layout(
+        flex = '1 0 2em',
+        width = '2em',
+    )
+    w_width = IntText(
+        layout=_layout,
+        value=width_value,
+    )
+    w_height = IntText(
+        layout=_layout,
+        value=height_value,
+    )
+    
+    container = HBox([
+        Label( 
+            value = '图片尺寸',
+            style = _description_style,
+            layout = Layout(
+                flex='0 0 auto',
+                width = '4rem',
+                # margin = '0 4px 0 0',
+                margin = '0 calc(var(--jp-widgets-inline-margin)*2) 0 0',
+            )
+        ),
+        w_width,
+        Label(
+            value = 'X',
+            layout = Layout(
+                flex='0 0 auto',
+                padding='0 1em'
+            ),
+        ),
+        w_height,
+    ])
+    setLayout('col04', container)
+    container.add_class('box_width_height')
+    
+    return Bunch({
+        'container': container,
+        'width': w_width,
+        'height': w_height,
+        'style_sheets': style_sheets,
+    })
+
+def createWidthHeightView(width_value = 512, height_value = 512, step64 = False):
+    if step64:
+        return _create_WHView()
+    else:
+        return _create_WHView_for_img2img()

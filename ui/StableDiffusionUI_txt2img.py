@@ -125,8 +125,8 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         STYLE_SHEETS = ('<style>' \
                 + views.SHARED_STYLE_SHEETS \
                 + STYLE_SHEETS \
-                + view_prompts['style_sheets'] \
-                + view_width_height['style_sheets'] \
+                + view_prompts.style_sheets \
+                + view_width_height.style_sheets \
                 + '</style>'
             ).replace('{root}', '.' + CLASS_NAME)
         
@@ -135,11 +135,11 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             class_name = CLASS_NAME,
             children = [
                 widgets.HTML(STYLE_SHEETS),
-                view_prompts['container'],
+                view_prompts.container,
                 views.createView("box_main", 
                 [
                     widget_opt['standard_size'],
-                    view_width_height['container'],
+                    view_width_height.container,
                     widget_opt['superres_model_name'],
                     widget_opt['num_inference_steps'],
                     widget_opt['guidance_scale'],
