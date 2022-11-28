@@ -12,7 +12,9 @@ from . import views
 class StableDiffusionUI_txt2img(StableDiffusionUI):
     def __init__(self, **kwargs):
         super().__init__()      #暂且不处理pipline
-        CLASS_NAME = self.__class__.__name__
+        
+        CLASS_NAME = self.__class__.__name__ \
+                + '_{:X}'.format(hash(self))[-4:]
         
         STYLE_SHEETS = '''
 @media (max-width:576px) {
