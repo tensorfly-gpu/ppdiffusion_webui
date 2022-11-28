@@ -1,5 +1,10 @@
+from datetime import datetime
+import os
+import shutil
 from .ui import StableDiffusionUI
+from .utils import save_image_info
 
+from IPython.display import clear_output
 import ipywidgets as widgets
 from ipywidgets import Layout,HBox,VBox,Box
 from . import views
@@ -132,29 +137,17 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
         self.run_button = views.createView('run_button')
         self.run_button.on_click(self.on_run_button_click)
         
-        collect_button = widgets.Button(
+        self.collect_button = widgets.Button(
             description='收藏图片',
             disabled=True,
             button_style='info',
             tooltip='将图片转移到Favorates文件夹中',
             icon='star-o'
         )
-        collect_button.add_class('collect_button')
+        self.collect_button.add_class('collect_button')
         
         self._output_collections = []
-        def collect_images(b):
-            dir = datetime.now().strftime('./Favorates/img2img-%m%d/') 
-            os.makedirs(dir, exist_ok=True)
-            
-            for file in self._output_collections:
-                if os.path.isfile(file):
-                    shutil.move(file, dir)
-                file = file[:-4] + '.txt'
-                if os.path.isfile(file):
-                    shutil.move(file, dir)
-            self._output_collections.clear()
-            
-        collect_button.on_click(collect_images)
+        self.collect_button.on_click(self.on_collect_button_click)
         
         # 样式表
         STYLE_SHEETS = ('<style>' \
@@ -194,19 +187,36 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
                     widget_opt['output_dir'],
                     widget_opt['concepts_library_dir']
                 ]),
-                self.run_button, collect_button,
+                self.run_button, self.collect_button,
                 self.run_button_out
             ], 
         )
-        
+
+    def on_collect_button_click(self, b):
+        with self.run_button_out:
+            dir = datetime.now().strftime(f'./Favorates/{self.task}-%m%d/') 
+            os.makedirs(dir, exist_ok=True)
+            print('收藏图片到'+dir)
+            
+            for file in self._output_collections:
+                if os.path.isfile(file):
+                    shutil.move(file, dir)
+                file = file[:-4] + '.txt'
+                if os.path.isfile(file):
+                    shutil.move(file, dir)
+            self._output_collections.clear()
+            self.collect_button.disabled = True
+
     def on_run_button_click(self, b):
-        self._output_collections.clear()
-        self.run_button.disabled = True
-        
-        try:
-            super().on_run_button_click()
-        finally:
-            self.run_button.disabled = False
+        with self.run_button_out:
+            self._output_collections.clear()
+            self.collect_button.disabled = True
+            self.run_button.disabled = True
+            try:
+                super().on_run_button_click(b)
+            finally:
+                self.run_button.disabled = False
+                self.collect_button.disabled = len(self._output_collections) < 1
            
            
     def on_image_generated(self, image, options, count, total):
@@ -224,6 +234,6 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
             display(image)
         
         print('Seed = ', image.argument['seed'], 
-            '    (%d / %d ... %.2f%%)'%(i + 1, total, (count + 1.) / total * 100))
+            '    (%d / %d ... %.2f%%)'%(count + 1, total, (count + 1.) / total * 100))
 
 

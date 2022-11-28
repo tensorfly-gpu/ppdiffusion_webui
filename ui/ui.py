@@ -82,7 +82,7 @@ class StableDiffusionUI():
             display(image)
         
         print('Seed = ', image.argument['seed'], 
-            '    (%d / %d ... %.2f%%)'%(i + 1, total, (count + 1.) / total * 100))
+            '    (%d / %d ... %.2f%%)'%(count + 1, total, (count + 1.) / total * 100))
 
 
 ####################################################################
