@@ -1,5 +1,6 @@
 
 from traitlets import Bunch
+import ipywidgets
 from ipywidgets import (
     Textarea,
     Text,
@@ -11,32 +12,39 @@ from ipywidgets import (
     Layout,
     Button,
     Label,
-    
+    HTML,
     Box, HBox, VBox,
 )
 
 _DefaultLayout = {
     'col04': {
         'flex':  "4 4 30%",
-        'min_width':  "5rem",    #480/ sm-576, md768, lg-992, xl-12000
-        'max_width':  "100%",
-        'margin':  "0.5em",
+        'min_width':  "6rem",    #480/ sm-576, md768, lg-992, xl-12000
+        'max_width':  "calc(100% - 0.75rem)",
+        'margin':  "0.375rem",
+        'align_items':  "center"
+    },
+    'col06': {
+        'flex':  "6 6 45%",
+        'min_width':  "9rem",   #手机9rem会换行
+        'max_width':  "calc(100% - 0.75rem)",
+        'margin':  "0.375rem",
         'align_items':  "center"
     },
     'col08': {
         'flex':  "8 8 60%",
-        'min_width':  "10rem",
-        'max_width':  "100%",
-        'margin':  "0.5em",
+        'min_width':  "12rem",
+        'max_width':  "calc(100% - 0.75rem)",
+        'margin':  "0.375rem",
         'align_items':  "center"
     },
     'col12': {
         'flex':  "12 12 90%",
-        'max_width':  "100%",
-        'margin':  "0.5em",
+        'max_width':  "calc(100% - 0.75rem)",
+        'margin':  "0.375rem",
         'align_items':  "center"
     },
-    'xs-flexwrap': {}, #未实现
+    'btnV5': {}, #见css
 }
 
 # 为工具设置布局，并标记dom class
@@ -62,9 +70,9 @@ _Views = {
         "class_name": 'prompt',
         "layout": {
             "flex": '1',
-            "min_height": '12em',
-            "max_width": '100%',
-            "margin": '0.5em',
+            "min_height": '10rem',
+            "max_width": 'calc(100% - 0.75rem)',
+            "margin": '0.375rem',
             "align_items": 'stretch'
         },
         "style": _description_style,
@@ -76,8 +84,8 @@ _Views = {
         "class_name": 'negative_prompt',
         "layout": {
             "flex": '1',
-            "max_width": '100%',
-            "margin": '0.5em',
+            "max_width": 'calc(100% - 0.75rem)',
+            "margin": '0.375rem',
             "align_items": 'stretch'
         },
         "style": _description_style,
@@ -261,17 +269,28 @@ _Views = {
     "run_button": {
         "__type": 'Button',
         "class_name": 'run_button',
+        "layout_name": 'btnV5',
         "button_style": 'success', # 'success', 'info', 'warning', 'danger' or ''
         "description": '生成图片！',
         "tooltip": '单击开始生成图片',
         "icon": 'check'
+    },
+    "collect_button": {
+        "__type": 'Button',
+        "class_name": 'collect_button',
+        "layout_name": 'btnV5',
+        "button_style": 'info', # 'success', 'info', 'warning', 'danger' or ''
+        "description": '收藏图片',
+        "tooltip": '将图片转移到Favorates文件夹中',
+        "icon": 'star-o',
+        "disabled": True,
     },
     
     # Box
     "box_gui": {
         "__type": 'Box',
         "layout": {
-            "display": 'block',
+            "display": 'block', #Box默认值为flex
             "margin": '0 45px 0 0',
         },
     },
@@ -309,15 +328,47 @@ SHARED_STYLE_SHEETS = '''
         text-align: left !important;
         font-size: small !important;
     }
+    {root} .col04,
+    {root} .col06 {
+        /*手机9rem会换行*/
+        min-width: 6rem !important; 
+    }
+}
+{root} {
+    background-color: var(--jp-layout-color1);
+}
+{root} .widget-text > label,
+{root} .widget-text > .widget-label {
+    user-select: none;
+}
+
+/* bootcss v5 */
+{root} button.btnV5.jupyter-button.widget-button
+{
+    height:auto;
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: center;
+    vertical-align: middle;
+    padding: .375rem .75rem;
+    font-size: 1rem;
+}
+{root} button.btnV5.btn-sm.jupyter-button.widget-button
+{
+    padding: .25rem .5rem;
+    font-size: .875rem;
+}
+{root} .jupyter-widgets.widget-tab > .p-TabBar .p-TabBar-tab {
+    padding: .5rem 0;
+    text-align: center;
+    transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out;
 }
 '''
-    
+
+CUSTOM_OPTIONS = ('__type','class_name', 'layout_name')
 def _mergeViewOptions(defaultOpt,kwargs):
     r = {}
-    for k in defaultOpt:
-        if k[0] != '_':
-            r[k] = defaultOpt[k]
-            #抛弃_开头的选项
+    r.update(defaultOpt)
     
     for k in kwargs:
         r[k] = kwargs[k]
@@ -331,8 +382,13 @@ def _mergeViewOptions(defaultOpt,kwargs):
     if ('layout' in r) and (type(r['layout']) == 'dict'):
         r.layout = Layout(**r['layout'])
     
+    #提取非ipywidgets参数
+    r2 = {}
+    for k in CUSTOM_OPTIONS:
+        if (k in r):
+            r2[k] = r.pop(k)
     
-    return r
+    return (r, r2)
 
     
     
@@ -343,38 +399,38 @@ def createView(name, value = None, **kwargs):
         raise Exception(f'View {name} 没有定义类型')
     
     # 合并参数
-    options = _mergeViewOptions(_Views[name], kwargs)
-    if value is not None: options['value'] = value
+    args, options = _mergeViewOptions(_Views[name], kwargs)
+    if value is not None: args['value'] = value
     
     # 创建实例
     widget = None
     __type = _Views[name]['__type']
     if __type == 'Textarea':
-        widget = Textarea(**options)
+        widget = Textarea(**args)
     elif __type == 'Text':
-        widget = Text(**options)
+        widget = Text(**args)
     elif __type == 'IntText':
-        widget = IntText(**options)
+        widget = IntText(**args)
     elif __type == 'BoundedIntText':
-        widget = BoundedIntText(**options)
+        widget = BoundedIntText(**args)
     elif __type == 'BoundedFloatText':
-        widget = BoundedFloatText(**options)
+        widget = BoundedFloatText(**args)
     elif __type == 'Dropdown':
-        widget = Dropdown(**options)
+        widget = Dropdown(**args)
     elif __type == 'Combobox':
-        widget = Combobox(**options)
+        widget = Combobox(**args)
     elif __type == 'Button':
-        widget = Button(**options)
+        widget = Button(**args)
     elif __type == 'Label':
-        widget = Label(**options)
+        widget = Label(**args)
     else:
-        if value is not None: options['children'] = value #有没有同时要value和children的部件？
+        if value is not None: args['children'] = value #有没有同时要value和children的部件？
         if __type == 'Box':
-            widget = Box(**options)
+            widget = Box(**args)
         elif __type == 'HBox':
-            widget = HBox(**options)
+            widget = HBox(**args)
         elif __type == 'VBox':
-            widget = VBox(**options)
+            widget = VBox(**args)
         else:
             raise Exception(f'View {name} 定义的类型{__type}未实现')
     
@@ -393,7 +449,7 @@ def createPromptsView(value = '', negative_value = ''):
     style_sheets = '''
 @media (max-width:576px) {
     {root} .box_prompts .prompt > textarea {
-        min-height:10em;
+        min-height:8rem;
         margin-left:2rem!important;
     }
     {root} .box_prompts .negative_prompt > textarea {
@@ -418,7 +474,7 @@ def createPromptsView(value = '', negative_value = ''):
         tooltip='填充标准质量描述',
         icon='palette',
         layout = Layout(
-            position = 'absolute',
+            #不支持的属性？ position = 'absolute',
             height = '1.8rem',
             width = '1.8rem',
             margin = '-11rem 0 0 0'
@@ -429,7 +485,7 @@ def createPromptsView(value = '', negative_value = ''):
         tooltip='填充标准负面描述',
         icon='paper-plane',
         layout = Layout(
-            position = 'absolute',
+            #不支持的属性？ position = 'absolute',
             height = '1.8rem',
             width = '1.8rem',
             margin = '-2rem 0px 0rem -1.8rem'
@@ -477,8 +533,8 @@ def _create_WHView(width_value = 512, height_value = 512):
 }
 '''
     _layout = Layout(
-        flex = '1 0 2em',
-        width = '2em',
+        flex = '1 0 2rem',
+        width = '2rem',
     )
     w_width = BoundedIntText(
         layout=_layout,
@@ -514,7 +570,7 @@ def _create_WHView(width_value = 512, height_value = 512):
             value = 'X',
             layout = Layout(
                 flex='0 0 auto',
-                padding='0 1em'
+                padding='0 0.75rem'
             ),
            # description_tooltip = '图片尺寸' if not step64 else '图片尺寸（-1为自动判断）'
         ),
@@ -532,7 +588,7 @@ def _create_WHView(width_value = 512, height_value = 512):
     
 def _create_WHView_for_img2img(width_value = -1, height_value = -1):
     style_sheets = '''
-{root} .box_width_height > .widget-label {
+{root} .box_width_height > .widget-label:first-of-type {
     text-align: right !important;
 }
 @media (max-width:576px) {
@@ -544,7 +600,7 @@ def _create_WHView_for_img2img(width_value = -1, height_value = -1):
         margin-top: 0.1rem !important;
         margin-bottom: 0.1rem !important;
     }
-    {root} .box_width_height > .widget-label {
+    {root} .box_width_height > .widget-label:first-of-type {
         width: 100% !important;
         text-align: left !important;
         font-size: small !important;
@@ -552,8 +608,8 @@ def _create_WHView_for_img2img(width_value = -1, height_value = -1):
 }
 '''
     _layout = Layout(
-        flex = '1 0 2em',
-        width = '2em',
+        flex = '1 0 2rem',
+        width = '2rem',
     )
     w_width = IntText(
         layout=_layout,
@@ -567,6 +623,7 @@ def _create_WHView_for_img2img(width_value = -1, height_value = -1):
     container = HBox([
         Label( 
             value = '图片尺寸',
+            description_tooltip = '-1表示自动检测',
             style = _description_style,
             layout = Layout(
                 flex='0 0 auto',
@@ -580,12 +637,12 @@ def _create_WHView_for_img2img(width_value = -1, height_value = -1):
             value = 'X',
             layout = Layout(
                 flex='0 0 auto',
-                padding='0 1em'
+                padding='0 0.75rem'
             ),
         ),
         w_height,
     ])
-    setLayout('col04', container)
+    setLayout('col08', container)
     container.add_class('box_width_height')
     
     return Bunch({
@@ -600,3 +657,29 @@ def createWidthHeightView(width_value = 512, height_value = 512, step64 = False)
         return _create_WHView()
     else:
         return _create_WHView_for_img2img()
+    
+def Tab(children = None, **kwargs):
+    titles = None if 'titles' not in kwargs else kwargs.pop('titles')
+    if children is not None: kwargs['children'] = children
+    tab = ipywidgets.Tab(**kwargs)
+    if titles is not None:
+        for i in range(len(titles)):
+            tab.set_title(i, titles[i])
+    return tab
+
+def Div(children = None, **kwargs):
+    if children is not None: kwargs['children'] = children
+    box = Box(**kwargs)
+    box.layout.display = 'block' # Box 默认flex
+    return box
+
+def FlexBox(children = None, **kwargs):
+    if children is not None: kwargs['children'] = children
+    box = Box(**kwargs)
+    box.layout.display = 'flex'
+    box.layout.flex_flow = 'row wrap' # HBox覆写nowrap，Box默认nowrap
+    box.layout.justify_content = 'space-around'  #注意覆写
+    box.layout.align_items = 'center',
+    box.layout.align_content = 'center',
+    return box
+    

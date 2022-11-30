@@ -5,27 +5,35 @@ import os
 os.environ['PPNLP_HOME'] = "./model_weights"
 from IPython.display import clear_output
 
-from .utils import diffusers_auto_update
-diffusers_auto_update(hint_kernel_restart = True)
 
-#from tqdm.auto import tqdm
-import paddle
+from .env import DEBUG_UI
 
-from .textual_inversion import parse_args as textual_inversion_parse_args
-from .textual_inversion import main as textual_inversion_main
-from .utils import StableDiffusionFriendlyPipeline, SuperResolutionPipeline, diffusers_auto_update
-from .utils import compute_gpu_memory, empty_cache
-from .utils import save_image_info
+if not DEBUG_UI:
 
-#_ENABLE_ENHANCE = False
+    from .utils import diffusers_auto_update
+    diffusers_auto_update(hint_kernel_restart = True)
 
-if paddle.device.get_device() != 'cpu':
-    # settings for super-resolution, currently not supporting multi-gpus
-    # see docs at https://github.com/PaddlePaddle/PaddleHub/tree/develop/modules/image/Image_editing/super_resolution/falsr_a
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    #from tqdm.auto import tqdm
+    import paddle
 
-pipeline_superres = SuperResolutionPipeline()
-pipeline = StableDiffusionFriendlyPipeline(superres_pipeline = pipeline_superres)
+    from .textual_inversion import parse_args as textual_inversion_parse_args
+    from .textual_inversion import main as textual_inversion_main
+    from .utils import StableDiffusionFriendlyPipeline, SuperResolutionPipeline, diffusers_auto_update
+    from .utils import compute_gpu_memory, empty_cache
+    from .utils import save_image_info
+
+    #_ENABLE_ENHANCE = False
+
+    if paddle.device.get_device() != 'cpu':
+        # settings for super-resolution, currently not supporting multi-gpus
+        # see docs at https://github.com/PaddlePaddle/PaddleHub/tree/develop/modules/image/Image_editing/super_resolution/falsr_a
+        os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
+    pipeline_superres = SuperResolutionPipeline()
+    pipeline = StableDiffusionFriendlyPipeline(superres_pipeline = pipeline_superres)
+else:
+    pipeline_superres = None
+    pipeline = None
 
 ####################################################################
 #
