@@ -1,6 +1,6 @@
-﻿
 from .env import DEBUG_UI
 
+from .config import config
 if DEBUG_UI:
     
     print('==================================================')
@@ -10,8 +10,8 @@ if DEBUG_UI:
     from .StableDiffusionUI_img2img import StableDiffusionUI_img2img
     from .StableDiffusionUI_inpaint import StableDiffusionUI_inpaint
     
-    gui_txt2img = StableDiffusionUI_txt2img()
-    gui_img2img = StableDiffusionUI_img2img()
+    gui_txt2img = StableDiffusionUI_txt2img(**config['txt2img'])
+    gui_img2img = StableDiffusionUI_img2img(**config['img2img'])
     gui_inpaint = StableDiffusionUI_inpaint()
     
 else:
@@ -29,8 +29,8 @@ else:
     from .SuperResolutionUI import SuperResolutionUI
 
 
-    gui_txt2img = StableDiffusionUI_txt2img()
-    gui_img2img = StableDiffusionUI_img2img()
+    gui_txt2img = StableDiffusionUI_txt2img(**config['txt2img'])
+    gui_img2img = StableDiffusionUI_img2img(**config['img2img'])
     gui_inpaint = StableDiffusionUI_inpaint()
     gui_superres = SuperResolutionUI(pipeline = pipeline_superres)
     gui_train_text_inversion = StableDiffusionUI_text_inversion()

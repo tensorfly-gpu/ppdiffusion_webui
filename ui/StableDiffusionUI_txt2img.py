@@ -31,13 +31,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
 '''
         
         #默认参数
-        args = {
-            'width': 512,
-            'height': 512,
-            'output_dir': "outputs/txt2img",
-            'prompt': "extremely detailed CG unity 8k wallpaper,black long hair,cute face,1 adult girl,happy, green skirt dress, flower pattern in dress,solo,green gown,art of light novel,in field",
-            'negative_prompt': "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry",
-        }
+        args = {}
         args.update(kwargs)
         widget_opt = self.widget_opt
 

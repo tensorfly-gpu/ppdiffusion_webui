@@ -465,7 +465,8 @@ class SuperResolutionPipeline():
                 image = None, 
                 task = 'superres', 
                 end_to_end = True,
-                force_empty_cache = True
+                force_empty_cache = True,
+                on_image_generated = None,
             ):
         """
         end_to_end: return PIL image if False, display in the notebook and autosave otherwise
@@ -509,7 +510,15 @@ class SuperResolutionPipeline():
         
         self.empty_cache(force_empty_cache)
         paddle.disable_static()
-
+        
+        if on_image_generated is not None:
+            on_image_generated(
+                image = image,
+                options = opt,
+                count = 0,
+                total = 1
+            )
+            return
         if end_to_end:
             cur_time = time.time()
             os.makedirs(opt.output_dir, exist_ok = True)

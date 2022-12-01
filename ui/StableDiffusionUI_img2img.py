@@ -60,19 +60,7 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
         self.task = 'img2img'
         
         #默认参数
-        args = {
-            'width': -1,
-            'height': -1,
-            'num_return_images': 1,
-            'output_dir': "outputs/img2img",
-            'prompt': "red dress",
-            'negative_prompt': "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry",
-            'model_name': "MoososCap/NOVEL-MODEL",
-            'image_path': 'resources/cat2.jpg',
-            'mask_path': 'resources/mask8.jpg',
-            'upload_image_path': 'resources/upload.png',
-            'upload_mask_path': 'resources/upload-mask.png',
-        }
+        args = {}
         args.update(kwargs)
         args['num_return_images'] = 1 #不支持批量生成
         # widget_opt = self.widget_opt

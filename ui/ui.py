@@ -79,6 +79,19 @@ class StableDiffusionUI():
             )
     
     def on_image_generated(self, image, options, count, total):
+        
+        # 超分
+        # --------------------------------------------------
+        if self.task == 'superres':
+            cur_time = time.time()
+            os.makedirs(options.output_dir, exist_ok = True)
+            image.save(os.path.join(options.output_dir,f'Highres_{cur_time}.png'), quality=100)
+            clear_output()
+            display(image)
+            return
+        
+        # 图生图/文生图
+        # --------------------------------------------------
         image_path = save_image_info(image, options.output_dir)
         if count % 5 == 0:
             clear_output()
@@ -90,8 +103,9 @@ class StableDiffusionUI():
         except:
             display(image)
         
-        print('Seed = ', image.argument['seed'], 
-            '    (%d / %d ... %.2f%%)'%(count + 1, total, (count + 1.) / total * 100))
+        if 'seed' in image.argument['seed']:
+            print('Seed = ', image.argument['seed'], 
+                '    (%d / %d ... %.2f%%)'%(count + 1, total, (count + 1.) / total * 100))
 
 
 ####################################################################
