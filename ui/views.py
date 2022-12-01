@@ -2,18 +2,14 @@
 from traitlets import Bunch
 import ipywidgets
 from ipywidgets import (
-    Textarea,
-    Text,
     IntText,
     BoundedIntText,
-    BoundedFloatText,
-    Dropdown,
-    Combobox,
     Layout,
     Button,
     Label,
-    HTML,
-    Box, HBox, VBox,
+    Box, HBox,
+    # Box应当始终假定display不明
+    # HBox/VBox应当仅用于【单行/单列】内容
 )
 
 _DefaultLayout = {
@@ -391,48 +387,27 @@ def _mergeViewOptions(defaultOpt,kwargs):
     return (r, r2)
 
     
-    
 def createView(name, value = None, **kwargs):
-    if name not in _Views:
-        raise Exception(f'未定义的View名称 {name}')
-    if '__type' not in _Views[name]:
-        raise Exception(f'View {name} 没有定义类型')
+    assert name in _Views, f'未定义的View名称 {name}'
+    assert '__type' in _Views[name], f'View {name} 没有声明组件类型'
     
     # 合并参数
     args, options = _mergeViewOptions(_Views[name], kwargs)
-    if value is not None: args['value'] = value
-    
-    # 创建实例
-    widget = None
+   
+    # 反射
     __type = _Views[name]['__type']
-    if __type == 'Textarea':
-        widget = Textarea(**args)
-    elif __type == 'Text':
-        widget = Text(**args)
-    elif __type == 'IntText':
-        widget = IntText(**args)
-    elif __type == 'BoundedIntText':
-        widget = BoundedIntText(**args)
-    elif __type == 'BoundedFloatText':
-        widget = BoundedFloatText(**args)
-    elif __type == 'Dropdown':
-        widget = Dropdown(**args)
-    elif __type == 'Combobox':
-        widget = Combobox(**args)
-    elif __type == 'Button':
-        widget = Button(**args)
-    elif __type == 'Label':
-        widget = Label(**args)
-    else:
-        if value is not None: args['children'] = value #有没有同时要value和children的部件？
-        if __type == 'Box':
-            widget = Box(**args)
-        elif __type == 'HBox':
-            widget = HBox(**args)
-        elif __type == 'VBox':
-            widget = VBox(**args)
-        else:
-            raise Exception(f'View {name} 定义的类型{__type}未实现')
+    assert hasattr(ipywidgets, __type), f'View {name} 声明的组件{__type}未被实现'
+    ctor = getattr(ipywidgets, __type)
+    
+    if value is None:
+        pass
+    elif hasattr(ctor, 'value'):
+        args['value'] = value
+    elif hasattr(ctor, 'children'):
+        args['children'] = value
+    
+    #实例化
+    widget = ctor(**args)
     
     # 添加DOM class名
     if 'class_name' in options:
@@ -540,14 +515,14 @@ def _create_WHView(width_value = 512, height_value = 512):
         layout=_layout,
         value=width_value,
         min=64,
-        max=1024,
+        max=1088,
         step=64,
     )
     w_height = BoundedIntText(
         layout=_layout,
         value=height_value,
         min=64,
-        max=1024,
+        max=1088,
         step=64,
     )
     

@@ -1,13 +1,21 @@
 from .ui import StableDiffusionUI
 
 import ipywidgets as widgets
-from ipywidgets import Layout,HBox,VBox,Box
-from . import views
+from ipywidgets import Layout,HBox,VBox,Box 
 
 class SuperResolutionUI(StableDiffusionUI):
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, pipeline, **kwargs):
+        super().__init__(pipeline = pipeline)
         self.task = 'superres'
+        
+        #默认参数覆盖次序：
+        #user_config.py > config.py > 当前args > views.py
+        args = {  #注意无效Key错误
+            "image_path": 'resources/Ring.png',
+            "superres_model_name": 'falsr_a',
+            "output_dir": 'outputs/highres',
+        }
+        args.update(kwargs)
         widget_opt = self.widget_opt
         
         layoutCol12 = Layout(
@@ -22,14 +30,14 @@ class SuperResolutionUI(StableDiffusionUI):
         widget_opt['image_path'] = widgets.Text(
             layout=layoutCol12, style=styleDescription,
             description='需要超分的图片路径' ,
-            value='resources/Ring.png',
+            value=args['image_path'],
             disabled=False
         )
 
         widget_opt['superres_model_name'] = widgets.Dropdown(
             layout=layoutCol12, style=styleDescription,
             description='超分模型的名字',
-            value="falsr_a",
+            value=args['superres_model_name'],
             options=["falsr_a", "falsr_b", "falsr_c"],
             disabled=False
         )
@@ -37,7 +45,7 @@ class SuperResolutionUI(StableDiffusionUI):
         widget_opt['output_dir'] = widgets.Text(
             layout=layoutCol12, style=styleDescription,
             description='图片的保存路径',
-            value="outputs/highres",
+            value=args['output_dir'],
             disabled=False
         )
         

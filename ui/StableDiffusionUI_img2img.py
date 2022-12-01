@@ -59,8 +59,20 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
         
         self.task = 'img2img'
         
-        #默认参数
-        args = {}
+        #默认参数覆盖次序：
+        #user_config.py > config.py > 当前args > views.py
+        args = {  #注意无效Key错误
+            "prompt": '',
+            "negative_prompt": '',
+            "width": -1,
+            "height": -1,
+            "num_return_images": 1,
+            "strength": 0.8,
+            "image_path": '',
+            "mask_path": '',
+            "upload_image_path": 'resources/upload.png',
+            "upload_mask_path": 'resources/upload-mask.png',
+        }
         args.update(kwargs)
         args['num_return_images'] = 1 #不支持批量生成
         # widget_opt = self.widget_opt
@@ -132,7 +144,7 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
                 },
             description='修改强度',
             description_tooltip='修改图片的强度',
-            value=0.8,
+            value=args['strength'],
             min=0.01,
             max=0.99,
             step=0.01,

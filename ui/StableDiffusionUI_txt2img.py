@@ -30,8 +30,14 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
 }
 '''
         
-        #默认参数
-        args = {}
+        #默认参数覆盖次序：
+        #user_config.py > config.py > 当前args > views.py
+        args = {  #注意无效Key错误
+            "prompt": '',
+            "negative_prompt": '',
+            "width": 512,
+            "height": 512,
+        }
         args.update(kwargs)
         widget_opt = self.widget_opt
 
@@ -49,7 +55,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         # 图片尺寸部分
         view_width_height = views.createWidthHeightView(
             width_value = args['width'], 
-            height_value = args['width'], 
+            height_value = args['height'], 
             step64 = True,
         )
         widget_opt['width'] = view_width_height['width']
@@ -146,7 +152,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
     def on_collect_button_click(self, b):
         with self.run_button_out:
             dir = datetime.now().strftime(f'Favorates/{self.task}-%m%d/') 
-            info = f'收藏图片到 ' + dir
+            info = '收藏图片到 ' + dir
             dir = './' + dir
             os.makedirs(dir, exist_ok=True)
             

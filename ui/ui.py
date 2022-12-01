@@ -3,7 +3,8 @@
 
 import os
 os.environ['PPNLP_HOME'] = "./model_weights"
-from IPython.display import clear_output
+import time
+from IPython.display import clear_output, display
 
 
 from .env import DEBUG_UI
@@ -164,25 +165,29 @@ class StableDiffusionTrainUI():
             self.run(get_widget_extractor(self.widget_opt))
             
 class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
         self.parse_args = textual_inversion_parse_args
         self.main = textual_inversion_main
-
-        layoutCol04 = Layout(
-            flex = "4 4 30%",
-            min_width = "160px",
-            max_width = "100%",
-            margin = "0.5em",
-            align_items = "center"
-        )
-        layoutCol08 = Layout(
-            flex = "8 8 60%",
-            min_width = "320px",
-            max_width = "100%",
-            margin = "0.5em",
-            align_items = "center"
-        )
+        
+        #默认参数覆盖次序：
+        #user_config.py > config.py > 当前args > 实例化
+        args = {  #注意无效Key错误
+            "learnable_property": 'object',
+            "placeholder_token": '<Alice>',
+            "initializer_token": 'girl',
+            "repeats": '100',
+            "train_data_dir": 'resources/Alices',
+            "output_dir": 'outputs/textual_inversion',
+            "height": 512,
+            "width": 512,
+            "learning_rate": 5e-4,
+            "max_train_steps": 1000,
+            "save_steps": 200,
+            "model_name": "hakurei/waifu-diffusion-v1-3",
+        }
+        args.update(kwargs)
+        
         layoutCol12 = Layout(
             flex = "12 12 90%",
             margin = "0.5em",
@@ -308,6 +313,10 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
             disabled=False
         )
         
+        for key in widget_opt:
+            if (key in args) and (args[key] != widget_opt[key].value):
+                widget_opt[key].value = args[key]
+        
         self.run_button = widgets.Button(
             description='开始训练',
             disabled=False,
@@ -342,196 +351,3 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
                 self.run_button_out
             ], layout = Layout(display="block",margin="0 45px 0 0")
         )
-
-class StableDiffusionUI_text_inversion_prediction(StableDiffusionUI):
-    def __init__(self):
-        super().__init__()
-        widget_opt = self.widget_opt
-        widget_opt['prompt'] = widgets.Textarea(
-            layout=layout, style=style,
-            description='prompt描述' + '&nbsp;' * 22,
-            value="<Alice> at the lake",
-            disabled=False
-        )
-        widget_opt['negative_prompt'] = widgets.Textarea(
-            layout=layout, style=style,
-            description='negative_prompt反面描述 <br />',
-            value="",
-            disabled=False
-        )
-
-        widget_opt['height'] = widgets.IntText(
-            layout=layout, style=style,
-            description='图片的高度(像素), 64的倍数',
-            value=512,
-            step=64,
-            disabled=False
-        )
-
-        widget_opt['width'] = widgets.IntText(
-            layout=layout, style=style,
-            description='图片的宽度(像素), 64的倍数',
-            value=512,
-            step=64,
-            disabled=False
-        )
-
-        widget_opt['num_return_images'] = widgets.BoundedIntText(
-            layout=layout, style=style,
-            description='生成图片数量' + '&nbsp;'*22,
-            value=1,
-            min=1,
-            max=100,
-            step=1,
-            disabled=False
-        )
-
-        widget_opt['num_inference_steps'] = widgets.IntText(
-            layout=widgets.Layout(width='33%'), style=style,
-            description='推理的步数' + '&nbsp'*24 ,
-            value=50,
-            disabled=False
-        )
-
-        widget_opt['guidance_scale'] = widgets.BoundedFloatText(
-            layout=widgets.Layout(width='33%'), style=style,
-            description= '&nbsp;'*22 + 'cfg',
-            min=0,
-            max=100,
-            value=7.5,
-            disabled=False
-        )
-
-        widget_opt['fp16'] = widgets.Dropdown(
-            layout=widgets.Layout(width='33%'), style=style,
-            description='&nbsp;'*15 + '精度' + '&nbsp;'*1,
-            value="float32",
-            options=["float32", "float16"],
-            disabled=False
-        )
-
-        widget_opt['max_embeddings_multiples'] = widgets.Dropdown(
-            layout=widgets.Layout(width='33%'), style=style,
-            description='长度上限倍数' + '&nbsp;'*21,
-            value="3",
-            options=["1","2","3","4","5"],
-            disabled=False
-        )
-        
-        widget_opt['enable_parsing'] = widgets.Dropdown(
-            layout=widgets.Layout(width='33%'), style=style,
-            description='&nbsp;'*12 +'括号修改权重',
-            value="圆括号 () 加强权重",
-            options=["圆括号 () 加强权重","花括号 {} 加权权重", "否"],
-            disabled=False
-        )
-
-        widget_opt['output_dir'] = widgets.Text(
-            layout=layout, style=style,
-            description='图片的保存路径' + '&nbsp;'*18,
-            value="outputs/text_inversion_txt2img",
-            disabled=False
-        )
-        
-        widget_opt['seed'] = widgets.IntText(
-            layout=layout, style=style,
-            description='随机数种子(-1表示不设置随机种子)',
-            value=-1,
-            disabled=False
-        )
-
-        widget_opt['sampler'] = widgets.Dropdown(
-            layout=widgets.Layout(width='50%'), style=style,
-            description='采样器' + '&nbsp;'*30,
-            value='default',
-            options=[
-                'default', 
-                'DPMSolver',
-                'EulerDiscrete',
-                'EulerAncestralDiscrete', 
-                'PNDM', 
-                'DDIM', 
-                'LMSDiscrete',
-            ], 
-            disabled=False
-        )
-        widget_opt['model_name'] = widgets.Dropdown(
-            layout=layout, style=style,
-            description='需要加载的模型名称',
-            value="hakurei/waifu-diffusion-v1-3",
-            options=[
-                'CompVis/stable-diffusion-v1-4', 
-                'runwayml/stable-diffusion-v1-5', 
-                'stabilityai/stable-diffusion-2', 
-                'stabilityai/stable-diffusion-2-base', 
-                'hakurei/waifu-diffusion', 
-                'hakurei/waifu-diffusion-v1-3', 
-                'naclbit/trinart_stable_diffusion_v2_60k', 
-                'naclbit/trinart_stable_diffusion_v2_95k', 
-                'naclbit/trinart_stable_diffusion_v2_115k', 
-                'IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1', 
-                'IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1', 
-                'BAAI/AltDiffusion', 
-                'BAAI/AltDiffusion-m9',
-                'MoososCap/NOVEL-MODEL', 
-                'ruisi/anything',
-                'Linaqruf/anything-v3.0', 
-            ],
-            disabled=False
-        )
-        widget_opt['superres_model_name'] = widgets.Dropdown(
-            layout=widgets.Layout(width='50%'), style=style,
-            description='&nbsp;'*15 + '超分模型',
-            value="无",
-            options=["falsr_a", "falsr_b", "falsr_c", "无"],
-            disabled=False
-        )
-
-        widget_opt['concepts_library_dir'] = widgets.Text(
-            layout=layout, style=style,
-            description='需要导入的"风格"或"人物"权重路径' + '&nbsp;'*4,
-            value="outputs/textual_inversion",
-            disabled=False
-        )
-
-        self.run_button = widgets.Button(
-            description='点击生成图片！',
-            disabled=False,
-            button_style='success', # 'success', 'info', 'warning', 'danger' or ''
-            tooltip='Click to run (settings will update automatically)',
-            icon='check'
-        )
-        
-        self.run_button.on_click(self.on_run_button_click)
-    
-        self.hboxes = {}
-        self.hboxes['param1'] = widgets.HBox([
-            widget_opt['num_inference_steps'],
-            widget_opt['guidance_scale'],
-            widget_opt['fp16']
-        ])
-        self.hboxes['tokenizer_settings'] = widgets.HBox([
-            widget_opt['max_embeddings_multiples'],
-            widget_opt['enable_parsing']
-        ])
-        self.hboxes['model'] = widgets.HBox([
-            widget_opt['model_name'],
-            widget_opt['sampler'],
-            widget_opt['superres_model_name']
-        ])
-
-        self.gui = widgets.VBox([
-            widget_opt['prompt'],
-            widget_opt['negative_prompt'],
-            widget_opt['height'],
-            widget_opt['width'],
-            widget_opt['num_return_images'],
-            self.hboxes['param1'],
-            self.hboxes['tokenizer_settings'],
-            widget_opt['output_dir'],
-            widget_opt['seed'],
-            self.hboxes['model'],
-            widget_opt['concepts_library_dir'],
-            self.run_button, 
-            self.run_button_out
-        ])
