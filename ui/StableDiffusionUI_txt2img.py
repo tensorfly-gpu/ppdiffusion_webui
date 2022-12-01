@@ -132,7 +132,13 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
                     widget_opt['output_dir'],
                     widget_opt['concepts_library_dir']
                 ]),
-                self.run_button, self.collect_button,
+                HBox(
+                    (self.run_button,self.collect_button,),
+                    layout = Layout(
+                        justify_content = 'space-around',
+                        max_width = '100%',
+                    )
+                ),
                 self.run_button_out
             ], 
         )
@@ -173,9 +179,8 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
             clear_output()
         
         try:
-            with open(image_path,'rb') as file:
-                data = file.read()
-            display(widgets.Image(value = data))    # 使显示的图片包含嵌入信息
+            # 使显示的图片包含嵌入信息
+            display(widgets.Image.from_file(image_path))
         except:
             display(image)
         

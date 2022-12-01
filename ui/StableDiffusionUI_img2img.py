@@ -241,6 +241,9 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
                 self.run_button_out,
             ),
         )
+        self.run_button_out.layout.width = '100%'
+        self.run_button_out.layout.margin = '0'
+        self.run_button_out.align_self = 'stretch'
         panel01.add_class('panel01')
         
         tab_right = Tab(
@@ -400,6 +403,7 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
                     if not view_image_mask.set_file(path): raise IOError('未能读取文件：'+path)
                     tab_left.selected_index = 2
                 else:
+                    view_image_mask.set_file()
                     tab_left.selected_index = 1
                 view_image_output.set_file()
             return
@@ -540,7 +544,7 @@ def createPanelImage(filename = None):
         max_height = '500px',
     )
     
-    _None_Image = widgets.HTML('无效的图片或未选中图片')
+    _None_Image = widgets.HTML('未选中图片或无效的图片')
     
     container = HBox(
         layout = Layout(
