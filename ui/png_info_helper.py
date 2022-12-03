@@ -54,7 +54,7 @@ MAP_PARAM_TO_LABEL = {
     'num_inference_steps': 'Steps: ', #用于与webui保持一致
     'sampler': 'Sampler: ',
     'guidance_scale': 'CFG scale: ',
-    'strength': 'Strength',
+    'strength': 'Strength: ',
     'seed': 'Seed: ',
     'width':'width: ',
     'height':'height: ',
