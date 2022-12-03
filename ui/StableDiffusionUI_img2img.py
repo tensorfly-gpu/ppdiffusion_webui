@@ -3,6 +3,7 @@ import os
 import shutil
 from .ui import StableDiffusionUI
 from .utils import save_image_info
+from .png_info_helper import deserialize_from_filename, InfoFormat
 
 from IPython.display import clear_output, display
 import ipywidgets as widgets
@@ -410,6 +411,10 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
             with self.run_button_out:
                 path = view_upload.confirm()
                 if not view_image.set_file(path): raise IOError('未能读取文件：'+path)
+                
+                # 试图从图片更新prompt信息
+                self._update_prompt_from_image(path)
+                
                 if whether_use_mask():
                     path = view_upload_mask.confirm()
                     if not view_image_mask.set_file(path): raise IOError('未能读取文件：'+path)
@@ -460,8 +465,8 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
             self.run_button.disabled = False
             self.collect_button.disabled = len(self._output_collections) < 1
  
-    def on_image_generated(self, image, options, count, total):
-        image_path = save_image_info(image, options.output_dir)
+    def on_image_generated(self, image, options, count = 0, total = 1, image_info = None):
+        image_path = save_image_info( image, options.output_dir, image_info)
         self._output_collections.append(image_path)
         
         self._set_output_image(image_path)
@@ -473,7 +478,15 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
         print('> ' + image_path)
         print('    (%d / %d ... %.2f%%)'%(count + 1, total, (count + 1.) / total * 100))
 
-            
+    def _update_prompt_from_image(self, path):
+        info, fmt = deserialize_from_filename(path)
+        if fmt is InfoFormat.Unknown: return False
+        
+        for key in ('prompt','negative_prompt', 'seed'):
+            if key in info:
+                self.widget_opt[key].value = info[key]
+        return True
+        
 def _createUploadView(
         label = '输入图片', 
         tooltip = '需要转换的图片的路径',
@@ -526,9 +539,9 @@ def _createUploadView(
             #检查文件类型
             path = upload_path
             if dict['metadata']['type'] == 'image/jpeg':
-                path = upload_path.split('.')[0] + '.jpg'
+                path = upload_path.partition('.')[0] + '.jpg'
             elif dict['metadata']['type'] == 'image/png':
-                path = upload_path.split('.')[0] + '.png'
+                path = upload_path.partition('.')[0] + '.png'
             print('保存上传到：'+path)
             with open(path, 'wb') as file:
                 file.write(dict['content'])

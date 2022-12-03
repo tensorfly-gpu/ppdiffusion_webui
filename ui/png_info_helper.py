@@ -129,6 +129,26 @@ def serialize_to_pnginfo(params, existing_info = None, mark_paddle = True):
         
     return pnginfo
 
+# 专用于highres
+def imageinfo_to_pnginfo(info, update_format = True):
+    # 将[Paddle]升级为[PaddleLikeWebUI]
+    dict = {}
+    if ('prompt' in info) and update_format:
+        # 如果是[Paddle]，那么将其转换为[PaddleLikeWebUI]，并舍弃掉[Paddle]信息
+        dict['parameters'] = serialize_to_text(info)
+        for k in info:
+            if k not in PRAM_NAME_LIST: dict[k] = info[k]
+    # 可信的info
+    for k in ('Title', 'Description', 'Software', 'Source', 'Comment', 'parameters'):
+        if k in info:
+            dict[k] = info[k]
+
+    pnginfo = PngImagePlugin.PngInfo()
+    for key, val in dict.items():
+        pnginfo.add_text(key, str(val))
+        
+    return pnginfo
+    
 # --------------------------------------------------
 # 反序列化
 # --------------------------------------------------

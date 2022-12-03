@@ -4,7 +4,8 @@ from contextlib import nullcontext, contextmanager
 from IPython.display import clear_output, display
 from pathlib import Path
 
-from PIL import Image, PngImagePlugin
+from PIL import Image
+from .png_info_helper import serialize_to_text, serialize_to_pnginfo
 import paddle
 
 _VAE_SIZE_THRESHOLD_ = 300000000       # vae should not be smaller than this
@@ -129,36 +130,16 @@ def context_nologging():
         yield
     finally:
         logging.disable(30)
-
-def serialize_png_info(argument):
-    labels = { 'prompt': '',
-        'negative_prompt': 'Negative prompt: ', #用于与webui保持一致
-        'num_inference_steps': 'Steps: ', #用于与webui保持一致
-        'sampler': 'Sampler: ',
-        'guidance_scale': 'CFG Scale: ',
-        'strength': 'Strength',
-        'seed': 'Seed: ',
-        'width':'width: ',
-        'height':'height: ',
-    }
-    info = ''
-    for k in labels:
-        if k in argument: info += labels[k] + str(argument[k]) + '\n'
-    
-    for k in argument:
-        if k not in labels: info += k + ': ' + str(argument[k]) + '\n'
-    
-    return info
-        
-def save_image_info(image, path = './outputs/'):
+ 
+def save_image_info(image, path = './outputs/', existing_info = None):
     """Save image to a path with arguments."""
     os.makedirs(path, exist_ok=True)
-    cur_time = time.time()
     seed = image.argument['seed']
-    filename = f'{cur_time}_SEED_{seed}'
-    pnginfo_data = PngImagePlugin.PngInfo()
-    info_text = serialize_png_info(image.argument)
-    pnginfo_data.add_text('parameters', info_text)
+    filename = time.strftime(f'%Y-%m-%d_%H-%M-%S_SEED_{seed}')
+    
+    pnginfo_data = serialize_to_pnginfo(image.argument, existing_info)
+    info_text = serialize_to_text(image.argument)
+    
     with open(os.path.join(path, filename + '.txt'), 'w') as f:
         f.write('Prompt: '+ info_text)
     image_path = os.path.join(path, filename + '.png')
@@ -368,7 +349,10 @@ class StableDiffusionFriendlyPipeline():
             negative_prompt = negative_prompt.translate({40:123, 41:125, 123:40, 125:41})
         elif '()' in opt.enable_parsing:
             enable_parsing = True
-
+        
+        
+        init_image = None
+        mask_image = None
         if task == 'txt2img':
             def task_func():
                 return self.pipe.text2image(
@@ -382,10 +366,11 @@ class StableDiffusionFriendlyPipeline():
                                     skip_parsing=(not enable_parsing)
                                 ).images[0]
         elif task == 'img2img':
+            init_image = ReadImage(opt.image_path, height=opt.height, width=opt.width)
             def task_func():
                 return self.pipe.img2img(
                                     prompt, seed=seed, 
-                                    init_image=ReadImage(opt.image_path, height=opt.height, width=opt.width), 
+                                    init_image=init_image, 
                                     num_inference_steps=opt.num_inference_steps, 
                                     strength=opt.strength, 
                                     guidance_scale=opt.guidance_scale, 
@@ -414,6 +399,7 @@ class StableDiffusionFriendlyPipeline():
         else:
             context = nullcontext()
             
+        image_info = init_image.info if init_image is not None else None
         with context:
             for i in range(opt.num_return_images):
                 empty_cache()
@@ -442,11 +428,12 @@ class StableDiffusionFriendlyPipeline():
                         image = image,
                         options = opt,
                         count = i,
-                        total = opt.num_return_images
+                        total = opt.num_return_images,
+                        image_info = image_info,
                     )
                     continue
-                    
-                save_image_info(image, opt.output_dir)
+                
+                save_image_info(image, opt.output_dir,image_info)
                 
                 if i % 5 == 0:
                     clear_output()

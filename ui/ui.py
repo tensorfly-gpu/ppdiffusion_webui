@@ -5,6 +5,7 @@ import os
 os.environ['PPNLP_HOME'] = "./model_weights"
 import time
 from IPython.display import clear_output, display
+from .png_info_helper import serialize_to_pnginfo
 
 
 from .env import DEBUG_UI
@@ -79,28 +80,35 @@ class StableDiffusionUI():
                 on_image_generated = self.on_image_generated
             )
     
-    def on_image_generated(self, image, options, count, total):
+    def on_image_generated(self, image, options,  count = 0, total = 1, image_info = None):
         
         # 超分
         # --------------------------------------------------
         if self.task == 'superres':
             cur_time = time.time()
             os.makedirs(options.output_dir, exist_ok = True)
-            image.save(os.path.join(options.output_dir,f'Highres_{cur_time}.png'), quality=100)
+            image_path = os.path.join(
+                options.output_dir,
+                time.strftime(f'%Y-%m-%d_%H-%M-%S_Highres.png')
+            )
+            image.save(
+                image_path,
+                quality=100,
+                pnginfo = imageinfo_to_pnginfo(image_info) if image_info is not None else None
+            )
             clear_output()
-            display(image)
+            display(widgets.Image.from_file(image_path))
             return
         
         # 图生图/文生图
         # --------------------------------------------------
-        image_path = save_image_info(image, options.output_dir)
+        image_path = save_image_info(image, options.output_dir, image_info)
         if count % 5 == 0:
             clear_output()
         
         try:
-            with open(image_path,'rb') as file:
-                data = file.read()
-            display(widgets.Image(value = data))    # 使显示的图片包含嵌入信息
+            # 使显示的图片包含嵌入信息
+            display(widgets.Image.from_file(image_path))
         except:
             display(image)
         

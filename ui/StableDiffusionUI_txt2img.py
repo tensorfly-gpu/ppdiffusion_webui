@@ -177,7 +177,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
                 self.run_button.disabled = False
                 self.collect_button.disabled = len(self._output_collections) < 1
 
-    def on_image_generated(self, image, options, count, total):
+    def on_image_generated(self, image, options, count = 0, total = 1, image_info = None):
         image_path = save_image_info(image, options.output_dir)
         self._output_collections.append(image_path)
         
