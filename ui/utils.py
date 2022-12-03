@@ -175,7 +175,7 @@ def ReadImage(image, height = None, width = None):
     return image
 
 def collect_local_module_names(base_paths = None):
-    """从指定位置检索可用的模型名"""
+    """从指定位置检索可用的模型名称，以用于UI选择模型"""
     base_paths = (
             './', 
             './models', 

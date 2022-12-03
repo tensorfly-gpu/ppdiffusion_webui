@@ -22,6 +22,7 @@ class InfoFormat(Enum):
     PaddleLikeWebUI = 5
     Unknown = 255
 
+# 所有Paddle输出的参数
 PRAM_NAME_LIST = (
     'prompt',
     'negative_prompt',
@@ -88,6 +89,9 @@ MAP_NAIFU_TAG_TO_PARAM = {
 
 # 输出[PaddleLikeWebUI]的样式
 def serialize_to_text(params):
+    """
+    将参数序列化为文本，以用于保存图片。格式[PaddleLikeWebUI]
+    """
     # Todo 剔除无用信息
     labels = MAP_PARAM_TO_LABEL
     info = ''
@@ -101,6 +105,10 @@ def serialize_to_text(params):
     
     
 def serialize_to_pnginfo(params, existing_info = None, mark_paddle = True):
+    """
+    将参数序列化到图像信息中。格式[PaddleLikeWebUI]
+    参数 existing_info 用于继承。
+    """
     text = serialize_to_text(params)
     
     dict = {}
@@ -129,9 +137,12 @@ def serialize_to_pnginfo(params, existing_info = None, mark_paddle = True):
         
     return pnginfo
 
-# 专用于highres
 def imageinfo_to_pnginfo(info, update_format = True):
-    # 将[Paddle]升级为[PaddleLikeWebUI]
+    """
+    从[Image.info]生成[PngInfo]，用于继承图片信息。
+    仅用于超分辨率（highres）的图片保存。
+    不认识的信息会被过滤掉。
+    """
     dict = {}
     if ('prompt' in info) and update_format:
         # 如果是[Paddle]，那么将其转换为[PaddleLikeWebUI]，并舍弃掉[Paddle]信息
@@ -234,8 +245,8 @@ def _deserialize_from_lines(enumerable, format_presumed = InfoFormat.Unknown):
         dict[k] = _parse_value(dict[k])
     return (dict,fmt)
     
-# 从一段文本获取图片信息[Paddle][PaddleLikeWebUI][WebUI]
 def deserialize_from_txt(text, format_presumed = InfoFormat.Unknown):
+    """ 从一段文本提取参数信息。支持格式[Paddle][PaddleLikeWebUI][WebUI] """
     return _deserialize_from_lines(text.splitlines(), format_presumed)
     
 # 直接从图片Info中收集信息[Paddle]
@@ -264,8 +275,8 @@ def _collect_from_pnginfo_naifu(info):
     except JSONDecodeError:
         return ({}, InfoFormat.Unknown)
 
-# 从图片获取参数信息（Image或文件地址）
 def deserialize_from_image(image):
+    """ 从图片获取参数信息。参数为Image或文件地址。"""
     if isinstance(image, str):
         assert os.path.isfile(image), f'{image}不是可读文件'
         image = Image.open(image)
@@ -280,9 +291,8 @@ def deserialize_from_image(image):
     # [Paddle]
     return _collect_from_pnginfo(image.info)
     
-# 从文本文件或图像文件获取参数信息
 def deserialize_from_filename(filename):
-    # 试图从文本文件获得信息
+    """ 从文本文件或图像文件获取参数信息，优先从其对应的文本文件中提取。参数为文件地址。"""
     txt_path, dot, ext = filename.rpartition('.')
     txt_path += '.txt'
     if os.path.isfile(txt_path):
