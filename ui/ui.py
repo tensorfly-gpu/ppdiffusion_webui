@@ -5,7 +5,7 @@ import os
 os.environ['PPNLP_HOME'] = "./model_weights"
 import time
 from IPython.display import clear_output, display
-from .png_info_helper import serialize_to_pnginfo
+from .png_info_helper import serialize_to_pnginfo, imageinfo_to_pnginfo
 
 
 from .env import DEBUG_UI

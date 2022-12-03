@@ -509,6 +509,8 @@ class SuperResolutionPipeline():
         import numpy as np
         if image is None:
             image = ReadImage(opt.image_path, height=None, width=None) # avoid resizing
+        image_info = image.info
+        
         image = np.array(image)
         image = image[:,:,[2,1,0]]  # RGB -> BGR
 
@@ -547,7 +549,8 @@ class SuperResolutionPipeline():
                 image = image,
                 options = opt,
                 count = 0,
-                total = 1
+                total = 1,
+                image_info = image_info,
             )
             return
         if end_to_end:
