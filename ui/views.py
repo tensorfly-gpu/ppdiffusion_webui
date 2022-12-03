@@ -11,6 +11,7 @@ from ipywidgets import (
     # Box应当始终假定display不明
     # HBox/VBox应当仅用于【单行/单列】内容
 )
+from .utils import collect_local_module_names
 
 _DefaultLayout = {
     'col04': {
@@ -409,6 +410,11 @@ def createView(name, value = None, **kwargs):
     #实例化
     widget = ctor(**args)
     
+    # 给模型列表补充本地模型
+    if name == 'model_name':
+        widget.options = list(widget.options) + \
+            [m for m in collect_local_module_names() if m not in widget.options]
+    
     # 添加DOM class名
     if 'class_name' in options:
         widget.add_class(options['class_name'])
@@ -632,6 +638,9 @@ def createWidthHeightView(width_value = 512, height_value = 512, step64 = False)
         return _create_WHView()
     else:
         return _create_WHView_for_img2img()
+        
+
+# --------------------------------------------------
     
 def Tab(children = None, **kwargs):
     titles = None if 'titles' not in kwargs else kwargs.pop('titles')

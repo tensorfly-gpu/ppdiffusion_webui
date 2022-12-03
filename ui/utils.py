@@ -174,6 +174,50 @@ def ReadImage(image, height = None, width = None):
         image = image.resize((width, height), Image.ANTIALIAS)
     return image
 
+def collect_local_module_names(base_paths = None):
+    """从指定位置检索可用的模型名"""
+    base_paths = (
+            './', 
+            './models', 
+            os.path.join(os.environ['PPNLP_HOME'], 'models')
+        ) if base_paths is None \
+        else (base_paths,) if isinstance(base_paths, str) \
+        else base_paths
+    
+    is_model = lambda base, name: (os.path.isfile(
+            os.path.join(base, name,'model_index.json')
+        )) and (os.path.isfile(
+            os.path.join(base, name,'vae', 'config.json')
+        )) and (os.path.isfile(
+            os.path.join(base, name,'unet', 'model_state.pdparams')
+        ))
+        
+    models = []
+    for base_path in base_paths:
+        if not os.path.isdir(base_path): continue
+        for name in os.listdir(base_path):
+            if name.startswith('.'): continue
+            
+            path = os.path.join(base_path, name)
+            
+            if path in base_paths: continue
+            if not os.path.isdir(path): continue
+            
+            if is_model(base_path, name):
+                models.append(name)
+                continue
+            
+            for name2 in os.listdir(path):
+                if name.startswith('.'): continue
+                path2 = os.path.join(path, name2)
+                if os.path.isdir(path2) and is_model(path, name2):
+                    models.append(f'{name}/{name2}')
+                    continue
+    
+    sorted(models)
+    return models
+
+    
 class StableDiffusionFriendlyPipeline():
     def __init__(self, model_name = "runwayml/stable-diffusion-v1-5", superres_pipeline = None):
         self.pipe = None
