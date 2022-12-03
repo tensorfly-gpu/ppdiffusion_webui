@@ -635,9 +635,9 @@ def _create_WHView_for_img2img(width_value = -1, height_value = -1):
 
 def createWidthHeightView(width_value = 512, height_value = 512, step64 = False):
     if step64:
-        return _create_WHView()
+        return _create_WHView(width_value, height_value)
     else:
-        return _create_WHView_for_img2img()
+        return _create_WHView_for_img2img(width_value, height_value)
         
 
 # --------------------------------------------------
