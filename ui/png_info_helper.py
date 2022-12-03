@@ -116,7 +116,7 @@ def serialize_to_pnginfo(params, existing_info = None, mark_paddle = True):
         pass
     elif 'parameters' in existing_info:
         # dict.update(existing_info)
-        dict['original_parameters'] = dict.pop('parameters')
+        dict['original_parameters'] = existing_info.pop('parameters')
     elif 'prompt' in existing_info:
         # 如果是[Paddle]，那么将其转换为[PaddleLikeWebUI]，并舍弃掉[Paddle]信息
         dict['original_parameters'] = serialize_to_text(existing_info)
