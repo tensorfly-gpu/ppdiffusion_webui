@@ -414,6 +414,7 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
                 
                 # 试图从图片更新prompt信息
                 self._update_prompt_from_image(path)
+                self._tab_right.selected_index = 0
                 
                 if whether_use_mask():
                     path = view_upload_mask.confirm()
@@ -485,6 +486,20 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
         for key in ('prompt','negative_prompt', 'seed'):
             if key in info:
                 self.widget_opt[key].value = info[key]
+        
+        if 'max_embeddings_multiples' in info: 
+            self.widget_opt['max_embeddings_multiples'].value = str(info['max_embeddings_multiples'])
+        
+        # 检查括号格式
+        if fmt is InfoFormat.WebUI:
+            self.widget_opt['enable_parsing'].value = '圆括号 () 加强权重'
+        elif fmt is InfoFormat.NAIFU:
+            self.widget_opt['enable_parsing'].value = '花括号 {} 加权权重'
+        elif 'prompt' in info:
+            c1 = info['prompt'].count('(') + info['prompt'].count(')')
+            c2 = info['prompt'].count('{') + info['prompt'].count('}')
+            self.widget_opt['enable_parsing'].value = '花括号 {} 加权权重' if (c2 > c1 + 1) else '圆括号 () 加强权重'
+        
         return True
         
 def _createUploadView(
@@ -583,7 +598,8 @@ def createPanelImage(filename = None):
     
     def set_file(filename = None):
         if filename is None or not os.path.isfile(filename):
-            container.children = (_None_Image,)
+            if _None_Image not in container.children:
+                container.children = (_None_Image,)
             return False
         else:
             img = widgets.Image.from_file(filename)

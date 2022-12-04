@@ -83,6 +83,17 @@ MAP_NAIFU_TAG_TO_PARAM = {
     'uc': 'negative_prompt',
 }
 
+# 可信的，是文本内容的tag。用于info信息继承
+RELIABEL_TAG_LIST = (
+    'Title', 
+    'Description', 
+    'Software', 
+    'Source', 
+    'Comment', 
+    'parameters',
+    'original_parameters',
+)
+
 # --------------------------------------------------
 # 序列化
 # --------------------------------------------------
@@ -144,13 +155,18 @@ def imageinfo_to_pnginfo(info, update_format = True):
     不认识的信息会被过滤掉。
     """
     dict = {}
-    if ('prompt' in info) and update_format:
-        # 如果是[Paddle]，那么将其转换为[PaddleLikeWebUI]，并舍弃掉[Paddle]信息
-        dict['parameters'] = serialize_to_text(info)
-        for k in info:
-            if k not in PRAM_NAME_LIST: dict[k] = info[k]
+    if ('prompt' in info):
+        if update_format:
+            # 如果是[Paddle]，那么将其转换为[PaddleLikeWebUI]，并舍弃掉[Paddle]信息
+            dict['parameters'] = serialize_to_text(info)
+            for k in info:
+                if k not in PRAM_NAME_LIST: dict[k] = info[k]
+        else:
+            for k in PRAM_NAME_LIST:
+                if k in info: dict[k] = info[k]
+                
     # 可信的info
-    for k in ('Title', 'Description', 'Software', 'Source', 'Comment', 'parameters'):
+    for k in RELIABEL_TAG_LIST:
         if k in info:
             dict[k] = info[k]
 
@@ -196,7 +212,12 @@ def _deserialize_from_lines(enumerable, format_presumed = InfoFormat.Unknown):
                 dict[name] = line
             elif name == 'prompt' or name == 'negative_prompt':
                 dict[name] += '\n' + line #追加上一行
-            elif line != '':
+            elif line == '':
+                pass
+            elif re.fullmatch(r'Strength[\d\.]+', name):
+                # 兼容之前Strength标签错误
+                dict['strength'] = name[8:]
+            else:
                 #不认识的换行参数
                 dict[name] += '\n' + line
 
