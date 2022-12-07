@@ -21,7 +21,7 @@ def empty_cache():
     """Empty CUDA cache. Essential in stable diffusion pipeline."""
     import gc
     gc.collect()
-    paddle.device.cuda.empty_cache()
+    # paddle.device.cuda.empty_cache()
 
 def check_is_model_complete(path = None, check_vae_size=_VAE_SIZE_THRESHOLD_):
     """Auto check whether a model is complete by checking the size of vae > check_vae_size.
@@ -74,9 +74,9 @@ def model_unzip(abs_path = None, name = None, dest_path = './', verbose = True):
         print('模型已存在')
 
 def package_install(verbose = True, dev_paddle = False):
-    # if (not os.path.exists('resources')) and os.path.exists('resources.zip'):
-    #     os.system("unzip resources.zip")
-    #     clear_output()
+    if (not os.path.exists('ppdiffusers')) and os.path.exists('ppdiffusers.zip'):
+        os.system("unzip ppdiffusers.zip")
+        clear_output()
     
     # if os.path.exists('resources/Alice.pdparams') and\
     #  (not os.path.exists('outputs/textual_inversion/Alice.pdparams')):
@@ -85,9 +85,6 @@ def package_install(verbose = True, dev_paddle = False):
     try:
         from paddlenlp.utils.tools import compare_version
         import ppdiffusers
-        if compare_version(ppdiffusers.__version__, "0.6.1") < 0:
-            if ppdiffusers.__version__ != "0.0.0":
-                os.system("pip install -U ppdiffusers --user")
         from paddlenlp.transformers.clip.feature_extraction import CLIPFeatureExtractor
         from paddlenlp.transformers import FeatureExtractionMixin
         
@@ -96,7 +93,7 @@ def package_install(verbose = True, dev_paddle = False):
         os.system("pip install --upgrade pip  -i https://mirror.baidu.com/pypi/simple")
         os.system("pip install -U ppdiffusers --user")
         # os.system("pip install --upgrade paddlenlp  -i https://mirror.baidu.com/pypi/simple")
-        os.system("pip install paddlenlp==2.4.1 --user")
+        os.system("pip install -U paddlenlp --user")
         clear_output()
 
     if dev_paddle:
@@ -157,6 +154,57 @@ def ReadImage(image, height = None, width = None):
         image = image.resize((width, height), Image.ANTIALIAS)
     return image
 
+def convert_pt_to_pdparams(path, dim = 768, save = True):
+    """Unsafe .pt embedding to .pdparams."""
+    path = str(path)
+    assert path.endswith('.pt'), 'Only support conversion of .pt files.'
+
+    import struct
+    with open(path, 'rb') as f:
+        data = f.read()
+    data = ''.join(chr(i) for i in data)
+
+    # locate the tensor in the file
+    tensors = []
+    for chunk in data.split('ZZZZ'):
+        chunk = chunk.strip('Z').split('PK')
+        if len(chunk) == 0:
+            continue
+
+        tensor = ''
+        for i in range(len(chunk)):
+            # extract the string with length 768 * (4k)
+            tensor += 'PK' + chunk[i]
+            if len(tensor) > 2 and len(tensor) % (dim * 4) == 2:
+                # remove the leading 'PK'
+                tensors.append(tensor[2:])
+
+    tensor = max(tensors, key = lambda x: len(x))
+
+    # convert back to binary representation
+    tensor = tensor.encode('latin')
+
+    # every four chars represent a float32
+    tensor = [struct.unpack('f', tensor[i:i+4])[0] for i in range(0, len(tensor), 4)]
+    tensor = paddle.to_tensor(tensor).reshape((-1, dim))
+    if tensor.shape[0] == 1:
+        tensor = tensor.flatten()
+
+    if save:
+        # locate the name of embedding
+        name = ''.join(filter(lambda x: ord(x) > 20, data.split('nameq\x12X')[1].split('q\x13X')[0]))
+        paddle.save({name: tensor}, path[:-3] + '.pdparams')
+
+    return tensor
+
+def get_multiple_tokens(token, num = 1, ret_list = True):
+    """Parse a single token to multiple tokens."""
+    tokens = ['%s_EMB_TOKEN_%d'%(token, i) for i in range(num)]
+    if ret_list:
+        return tokens
+    return ' '.join(tokens)
+
+
 class StableDiffusionFriendlyPipeline():
     def __init__(self, model_name = "runwayml/stable-diffusion-v1-5", superres_pipeline = None):
         self.pipe = None
@@ -176,6 +224,7 @@ class StableDiffusionFriendlyPipeline():
         self.superres_pipeline = superres_pipeline
 
         self.added_tokens = []
+        #self.token_vocabs = []
                 
     def from_pretrained(self, verbose = True, force = False, model_name=None):
         if model_name is not None:
@@ -195,6 +244,8 @@ class StableDiffusionFriendlyPipeline():
         with context_nologging():
             from ppdiffusers import StableDiffusionPipelineAllinOne
             self.pipe = StableDiffusionPipelineAllinOne.from_pretrained(model, safety_checker = None)
+            if self.pipe.tokenizer.model_max_length>100:
+                self.pipe.tokenizer.model_max_length = 77
 
         # # VAE
         # if vae is not None:
@@ -207,18 +258,32 @@ class StableDiffusionFriendlyPipeline():
         #         copy(model_vae_get_default(), local_vae) # copy from remote, avoid download everytime
 
         #     self.pipe.vae.load_dict(paddle.load(local_vae))
+        sdr = self.pipe.scheduler
 
+        self.available_schedulers = {}
+        self.available_schedulers['default'] = sdr
         # schedulers
-        if len(self.available_schedulers) == 0:
+        if len(self.available_schedulers) == 1:
             # register schedulers
-            from ppdiffusers import PNDMScheduler, DDIMScheduler, LMSDiscreteScheduler
+            from ppdiffusers import PNDMScheduler, DDIMScheduler, LMSDiscreteScheduler, EulerAncestralDiscreteScheduler, EulerDiscreteScheduler, DPMSolverMultistepScheduler
             # assume the current one is PNDM!!!
-            sdr: PNDMScheduler = self.pipe.scheduler
-            self.available_schedulers = {
+            self.available_schedulers.update({
+                "DPMSolver": DPMSolverMultistepScheduler.from_config(
+                    "CompVis/stable-diffusion-v1-4",  # or use the v1-5 version
+                    subfolder="scheduler",
+                    solver_order=2,
+                    predict_epsilon=True,
+                    thresholding=False,
+                    algorithm_type="dpmsolver++",
+                    solver_type="midpoint",
+                    denoise_final=True,  # the influence of this trick is effective for small (e.g. <=10) steps
+                ),
+                "EulerDiscrete": EulerDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"), 
+                'EulerAncestralDiscrete': EulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear"), 
                 'PNDM': PNDMScheduler(beta_start=sdr.beta_start, beta_end=sdr.beta_end,  beta_schedule=sdr.beta_schedule, skip_prk_steps=True),
-                'DDIM': DDIMScheduler(beta_start=sdr.beta_start, beta_end=sdr.beta_end, beta_schedule=sdr.beta_schedule, num_train_timesteps=sdr.num_train_timesteps, clip_sample=False, set_alpha_to_one=sdr.set_alpha_to_one),
-                'LMS' : LMSDiscreteScheduler(beta_start=sdr.beta_start, beta_end=sdr.beta_end, beta_schedule=sdr.beta_schedule, num_train_timesteps=sdr.num_train_timesteps)
-            }
+                'DDIM': DDIMScheduler(beta_start=sdr.beta_start, beta_end=sdr.beta_end, beta_schedule=sdr.beta_schedule, num_train_timesteps=sdr.num_train_timesteps, clip_sample=False, set_alpha_to_one=sdr.set_alpha_to_one, steps_offset=1,),
+                'LMSDiscrete' : LMSDiscreteScheduler(beta_start=sdr.beta_start, beta_end=sdr.beta_end, beta_schedule=sdr.beta_schedule, num_train_timesteps=sdr.num_train_timesteps)
+            })
 
 
         if verbose: print('成功加载完毕, 若默认设置无法生成, 请停止项目等待保存完毕选择GPU重新进入')
@@ -236,6 +301,14 @@ class StableDiffusionFriendlyPipeline():
             if path.exists():
                 file_paths = path.glob("*.pdparams")
 
+                                # conversion of .pt -> .pdparams embedding
+                pt_files = path.glob("*.pt")
+                for pt_file in pt_files:
+                    try:
+                        convert_pt_to_pdparams(pt_file, dim = 768, save = True)
+                    except:
+                        pass
+
             if opt.concepts_library_dir.endswith('.pdparams') and os.path.exists(opt.concepts_library_dir): 
                 # load single file
                 file_paths = [opt.concepts_library_dir]                
@@ -246,20 +319,25 @@ class StableDiffusionFriendlyPipeline():
                 # load the token safely in float32
                 original_dtype = self.pipe.text_encoder.dtype
                 self.pipe.text_encoder = self.pipe.text_encoder.to(dtype = 'float32')
-
+                self.added_tokens = []
                 for p in file_paths:
                     for token, embeds in paddle.load(str(p)).items():
-                        self.pipe.tokenizer.add_tokens(token)
-                        self.pipe.text_encoder.resize_token_embeddings(len(self.pipe.tokenizer))
-                        token_id = self.pipe.tokenizer.convert_tokens_to_ids(token)
-                        with paddle.no_grad():
-                            if paddle.max(paddle.abs(self.pipe.text_encoder.get_input_embeddings().weight[token_id] - embeds)) > 1e-4:
-                                # only add / update new token if it has changed
-                                has_updated = True
-                                self.pipe.text_encoder.get_input_embeddings().weight[token_id] = embeds
                         added_tokens.append(token)
-                        if token not in self.added_tokens:
-                            self.added_tokens.append(token)
+                        if embeds.dim() == 1:
+                            embeds = embeds.reshape((1, -1))
+                        tokens = get_multiple_tokens(token, embeds.shape[0], ret_list = True)
+                        self.added_tokens.append((token, ' '.join(tokens)))
+
+                        for token, embed in zip(tokens, embeds):
+                            self.pipe.tokenizer.add_tokens(token)
+                            self.pipe.text_encoder.resize_token_embeddings(len(self.pipe.tokenizer))
+                            token_id = self.pipe.tokenizer.convert_tokens_to_ids(token)
+                            with paddle.no_grad():
+                                if paddle.max(paddle.abs(self.pipe.text_encoder.get_input_embeddings().weight[token_id] - embed)) > 1e-4:
+                                    # only add / update new token if it has changed
+                                    has_updated = True
+                                    self.pipe.text_encoder.get_input_embeddings().weight[token_id] = embed
+
                             
 
         if is_exist_concepts_library_dir:
@@ -269,11 +347,11 @@ class StableDiffusionFriendlyPipeline():
         else:
             print(f"[导入训练文件] {opt.concepts_library_dir} 文件夹下没有发现任何文件，跳过加载！")
         
-        if self.added_tokens:
-            self_str_added_tokens = ", ".join(self.added_tokens)
-            print(f"[支持的'风格'或'人物'单词]: {self_str_added_tokens} ")
-        if original_dtype is not None:
-            self.pipe.text_encoder = self.pipe.text_encoder.to(dtype = original_dtype)
+        #if self.added_tokens:
+         #   self_str_added_tokens = ", ".join(self.added_tokens)
+         #   print(f"[支持的'风格'或'人物'单词]: {self_str_added_tokens} ")
+       # if original_dtype is not None:
+        #    self.pipe.text_encoder = self.pipe.text_encoder.to(dtype = original_dtype)
 
     def to(self, dtype = 'float32'):
         """dtype: one of 'float32' or 'float16'"""
@@ -318,6 +396,11 @@ class StableDiffusionFriendlyPipeline():
             negative_prompt = negative_prompt.translate({40:123, 41:125, 123:40, 125:41})
         elif '()' in opt.enable_parsing:
             enable_parsing = True
+                    # process tokens
+        for token in self.added_tokens:
+            prompt = prompt.replace(token[0], token[1])
+            negative_prompt = negative_prompt.replace(token[0], token[1])
+
 
         if task == 'txt2img':
             def task_func():
