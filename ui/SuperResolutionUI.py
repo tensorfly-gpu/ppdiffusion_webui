@@ -11,7 +11,7 @@ class SuperResolutionUI(StableDiffusionUI):
         #默认参数覆盖次序：
         #user_config.py > config.py > 当前args > views.py
         args = {  #注意无效Key错误
-            "image_path": 'resources/Ring.png',
+            "image_path": 'resources/image_Kurisu.png',
             "superres_model_name": 'falsr_a',
             "output_dir": 'outputs/highres',
         }

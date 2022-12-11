@@ -545,7 +545,10 @@ def _createUploadView(
     
     def reset():
         input.value = default_path
-        upload.value = ()
+        try:
+            upload.value = ()
+        except:
+            pass
     
     def confirm():
         # 【注意】v8.0与7.5的value结构不同

@@ -3,6 +3,30 @@
 
 import os
 os.environ['PPNLP_HOME'] = "./model_weights"
+model_name_list = [
+    "Linaqruf/anything-v3.0",
+    "MoososCap/NOVEL-MODEL", 
+    "Baitian/momocha",
+    "Baitian/momoco",
+    "hequanshaguo/monoko-e",
+    "ruisi/anything",
+    "hakurei/waifu-diffusion-v1-3", 
+    "CompVis/stable-diffusion-v1-4", 
+    "runwayml/stable-diffusion-v1-5", 
+    "stabilityai/stable-diffusion-2",
+    "stabilityai/stable-diffusion-2-base",
+    "hakurei/waifu-diffusion", 
+    "naclbit/trinart_stable_diffusion_v2_60k", 
+    "naclbit/trinart_stable_diffusion_v2_95k", 
+    "naclbit/trinart_stable_diffusion_v2_115k", 
+    "ringhyacinth/nail-set-diffuser",
+    "Deltaadams/Hentai-Diffusion",
+    "BAAI/AltDiffusion",
+    "BAAI/AltDiffusion-m9",
+    "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1",
+    "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1",
+    "huawei-noah/Wukong-Huahua"]
+
 import time
 from IPython.display import clear_output, display
 from .png_info_helper import serialize_to_pnginfo, imageinfo_to_pnginfo
@@ -13,7 +37,7 @@ from .env import DEBUG_UI
 if not DEBUG_UI:
 
     from .utils import diffusers_auto_update
-    diffusers_auto_update(hint_kernel_restart = True)
+    diffusers_auto_update()
 
     #from tqdm.auto import tqdm
     import paddle
@@ -140,10 +164,19 @@ class StableDiffusionTrainUI():
         for k, v in opt.items():
             setattr(args, k, v.value)
 
-        # TODO junnyu 是否切换权重
-        # runwayml/stable-diffusion-v1-5
         self.pipeline.from_pretrained(model_name=opt.model_name)
-        self.pipeline.to('float32')
+        
+        # todo junnyu
+        args.pretrained_model_name_or_path = opt.model_name
+        if args.language == "en":
+            if "chinese-en" in args.pretrained_model_name_or_path.lower():
+                args.language = "zh_en"
+            elif "chinese" in args.pretrained_model_name_or_path.lower():
+                args.language = "zh"
+        if args.image_logging_prompt is None:
+            args.image_logging_prompt = args.placeholder_token
+        ## done
+
         args.text_encoder = self.pipeline.pipe.text_encoder
         args.unet         = self.pipeline.pipe.unet
         args.vae          = self.pipeline.pipe.vae
@@ -155,9 +188,12 @@ class StableDiffusionTrainUI():
             args.train_batch_size = 4
             args.gradient_accumulation_steps = 1
 
+        if args.pretrained_model_name_or_path in ["stabilityai/stable-diffusion-2", "stabilityai/stable-diffusion-2-base", "BAAI/AltDiffusion", "BAAI/AltDiffusion-m9"]:
+            args.train_batch_size = 1
+            args.gradient_accumulation_steps = 4
+
         if args.train_data_dir is None:
             raise ValueError("You must specify a train data directory.")
-        # args.logging_dir = os.path.join(args.output_dir, args.logging_dir)
         
         # remove \/"*:?<>| in filename
         name = args.placeholder_token
@@ -192,7 +228,7 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
             "learning_rate": 5e-4,
             "max_train_steps": 1000,
             "save_steps": 200,
-            "model_name": "hakurei/waifu-diffusion-v1-3",
+            "model_name": "MoososCap/NOVEL-MODEL",
         }
         args.update(kwargs)
         
@@ -260,7 +296,7 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
             min=64,
             max=1024,
             step=64,
-            disabled=True
+            disabled=False
         )
         widget_opt['width'] = widgets.IntSlider(
             layout=layoutCol12, style=styleDescription,
@@ -270,7 +306,7 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
             min=64,
             max=1024,
             step=64,
-            disabled=True
+            disabled=False
         )
         widget_opt['learning_rate'] = widgets.FloatText(
             layout=layoutCol12, style=styleDescription,
@@ -298,25 +334,8 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
         widget_opt['model_name'] = widgets.Combobox(
             layout=layoutCol12, style=styleDescription,
             description='需要训练的模型名称',
-            value="hakurei/waifu-diffusion-v1-3",
-            options=[
-                'CompVis/stable-diffusion-v1-4', 
-                'runwayml/stable-diffusion-v1-5', 
-                'stabilityai/stable-diffusion-2', 
-                'stabilityai/stable-diffusion-2-base', 
-                'hakurei/waifu-diffusion', 
-                'hakurei/waifu-diffusion-v1-3', 
-                'naclbit/trinart_stable_diffusion_v2_60k', 
-                'naclbit/trinart_stable_diffusion_v2_95k', 
-                'naclbit/trinart_stable_diffusion_v2_115k', 
-                'IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1', 
-                'IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1', 
-                'BAAI/AltDiffusion', 
-                'BAAI/AltDiffusion-m9',
-                'MoososCap/NOVEL-MODEL', 
-                'ruisi/anything',
-                'Linaqruf/anything-v3.0', 
-            ],
+            value="MoososCap/NOVEL-MODEL",
+            options=model_name_list,
             ensure_option=False,
             disabled=False
         )

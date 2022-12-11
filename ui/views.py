@@ -1,4 +1,3 @@
-
 from traitlets import Bunch
 import ipywidgets
 from ipywidgets import (
@@ -13,6 +12,42 @@ from ipywidgets import (
 )
 from .utils import collect_local_module_names
 
+model_name_list = [
+    "Linaqruf/anything-v3.0",
+    "MoososCap/NOVEL-MODEL", 
+    "Baitian/momocha",
+    "Baitian/momoco",
+    "hequanshaguo/monoko-e",
+    "ruisi/anything",
+    "hakurei/waifu-diffusion-v1-3", 
+    "CompVis/stable-diffusion-v1-4", 
+    "runwayml/stable-diffusion-v1-5", 
+    "stabilityai/stable-diffusion-2",
+    "stabilityai/stable-diffusion-2-base",
+    "hakurei/waifu-diffusion", 
+    "naclbit/trinart_stable_diffusion_v2_60k", 
+    "naclbit/trinart_stable_diffusion_v2_95k", 
+    "naclbit/trinart_stable_diffusion_v2_115k", 
+    "ringhyacinth/nail-set-diffuser",
+    "Deltaadams/Hentai-Diffusion",
+    "BAAI/AltDiffusion",
+    "BAAI/AltDiffusion-m9",
+    "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1",
+    "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1",
+    "huawei-noah/Wukong-Huahua"]
+
+samler_list = [
+    "default",
+    "DPMSolver",
+    "EulerDiscrete",
+    "EulerAncestralDiscrete",
+    "PNDM",
+    "DDIM",
+    "LMSDiscrete",
+    "HeunDiscrete",
+    "KDPM2AncestralDiscrete",
+    "KDPM2Discrete"
+]
 _DefaultLayout = {
     'col04': {
         'flex':  "4 4 30%",
@@ -191,15 +226,7 @@ _Views = {
         "style": _description_style,
         "description": '采样器',
         "value": 'default',
-        "options": [
-            'default', 
-            'DPMSolver',
-            'EulerDiscrete',
-            'EulerAncestralDiscrete', 
-            'PNDM', 
-            'DDIM', 
-            'LMSDiscrete',
-        ], 
+        "options": samler_list, 
     },
     "standard_size": {
         "__type": 'Dropdown',
@@ -241,24 +268,7 @@ _Views = {
         "description": '模型名称',
         "description_tooltip": '需要加载的模型名称',
         "value": 'MoososCap/NOVEL-MODEL',
-        "options": [
-            'CompVis/stable-diffusion-v1-4', 
-            'runwayml/stable-diffusion-v1-5', 
-            'stabilityai/stable-diffusion-2', 
-            'stabilityai/stable-diffusion-2-base', 
-            'hakurei/waifu-diffusion', 
-            'hakurei/waifu-diffusion-v1-3', 
-            'naclbit/trinart_stable_diffusion_v2_60k', 
-            'naclbit/trinart_stable_diffusion_v2_95k', 
-            'naclbit/trinart_stable_diffusion_v2_115k', 
-            'IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1', 
-            'IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1', 
-            'BAAI/AltDiffusion', 
-            'BAAI/AltDiffusion-m9',
-            'MoososCap/NOVEL-MODEL', 
-            'ruisi/anything',
-            'Linaqruf/anything-v3.0', 
-        ],
+        "options": model_name_list,
         "ensure_option": False,
     },
     

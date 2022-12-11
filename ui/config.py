@@ -8,7 +8,7 @@ config = {
         # "num_return_images": 1,
         # "num_inference_steps": 50,
         # "guidance_scale": 7.5,
-        # "fp16": 'float32',
+        # "fp16": 'float16',
         # "superres_model_name": '无',
         # "max_embeddings_multiples": '3',
         # "enable_parsing": '圆括号 () 加强权重',
@@ -29,7 +29,7 @@ config = {
         "output_dir": 'outputs/img2img',
     },
     "superres": {
-        "image_path": 'resources/Ring.png',
+        "image_path": 'resources/image_Kurisu.png',
         "superres_model_name": 'falsr_a',
         "output_dir": 'outputs/highres',
     },
@@ -45,7 +45,7 @@ config = {
         "learning_rate": 5e-4,
         "max_train_steps": 1000,
         "save_steps": 200,
-        "model_name": "hakurei/waifu-diffusion-v1-3",
+        "model_name": "MoososCap/NOVEL-MODEL",
     },
     "text_inversion": {
         "width": 512,

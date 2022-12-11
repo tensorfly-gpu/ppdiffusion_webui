@@ -1,80 +1,13 @@
 import paddle
 from PIL import Image
-
+import gc
 def image_grid(imgs, rows=2, cols=2):
-    imgs = imgs.astype("uint8")
-    imgs = [Image.fromarray(img) for img in imgs]
     assert len(imgs) == rows * cols
     w, h = imgs[0].size
     grid = Image.new('RGB', size=(cols * w, rows * h))
     for i, img in enumerate(imgs):
         grid.paste(img, box=(i % cols * w, i // cols * h))
     return grid
-    
-@paddle.no_grad()
-def log_image(
-                input_ids=None,
-                text_encoder=None,
-                tokenizer=None,
-                unet=None,
-                vae=None,
-                eval_scheduler=None,
-                height=512,
-                width=512,
-                guidance_scale=7.5,
-                **kwargs):
-    text_encoder.eval()
-    if height % 8 != 0 or width % 8 != 0:
-        raise ValueError(
-            f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
-        )
-    # only log 8 image
-    # if input_ids.shape[0] == 1:
-    #     input_ids = input_ids.tile([4, 1])
-
-    text_embeddings = text_encoder(input_ids)[0]
-    do_classifier_free_guidance = guidance_scale > 1.0
-    if do_classifier_free_guidance:
-        batch_size, max_length = input_ids.shape
-        uncond_input = tokenizer([""] * batch_size,
-                                        padding="max_length",
-                                        truncation=True,
-                                        max_length=max_length,
-                                        return_tensors="pd")
-        uncond_embeddings = text_encoder(uncond_input.input_ids)[0]
-        text_embeddings = paddle.concat(
-            [uncond_embeddings, text_embeddings], axis=0)
-
-    latents = paddle.randn((input_ids.shape[0], unet.in_channels,
-                            height // 8, width // 8))
-    # ddim donot use this
-    latents = latents * eval_scheduler.init_noise_sigma
-
-    for t in eval_scheduler.timesteps:
-        # expand the latents if we are doing classifier free guidance
-        latent_model_input = paddle.concat(
-            [latents] * 2) if do_classifier_free_guidance else latents
-        # ddim donot use this
-        latent_model_input = eval_scheduler.scale_model_input(
-            latent_model_input, t)
-
-        # predict the noise residual
-        noise_pred = unet(latent_model_input,
-                                t,
-                                encoder_hidden_states=text_embeddings).sample
-        # perform guidance
-        if do_classifier_free_guidance:
-            noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + guidance_scale * (
-                noise_pred_text - noise_pred_uncond)
-        # compute the previous noisy sample x_t -> x_t-1
-        latents = eval_scheduler.step(noise_pred, t, latents).prev_sample
-
-    latents = 1 / 0.18215 * latents
-    image = vae.decode(latents).sample
-    image = (image / 2 + 0.5).clip(0, 1).transpose([0, 2, 3, 1]) * 255.
-    text_encoder.train()
-    return image.numpy().round()
 
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 The HuggingFace Team. All rights reserved.
@@ -92,43 +25,71 @@ def log_image(
 # limitations under the License.
 
 import argparse
+import glob
 import itertools
 import math
 import os
 import random
+from pathlib import Path
+
 import numpy as np
 import paddle
-import glob
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.io import Dataset, DataLoader, BatchSampler, DistributedBatchSampler
-
-from paddlenlp.utils.log import logger
-from paddlenlp.trainer import set_seed
-from ppdiffusers import AutoencoderKL, DDPMScheduler, PNDMScheduler, StableDiffusionPipeline, UNet2DConditionModel
-from ppdiffusers.optimization import get_scheduler
-from ppdiffusers.modeling_utils import unwrap_model
-
-import PIL
-from PIL import Image
-from paddlenlp.utils.tools import compare_version
-
-if compare_version(PIL.__version__, "9.1.0") >= 0:
-    Resampling = PIL.Image.Resampling
-else:
-    Resampling = PIL.Image
-from paddle.vision.transforms import RandomHorizontalFlip
+from paddle.io import BatchSampler, DataLoader, Dataset, DistributedBatchSampler
 from paddle.optimizer import AdamW
+from paddle.vision.transforms import RandomHorizontalFlip
+from PIL import Image
 from tqdm.auto import tqdm
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 
+from paddlenlp.trainer import set_seed
+from paddlenlp.transformers import AutoTokenizer, BertModel, CLIPTextModel
+from paddlenlp.utils.log import logger
+try:
+    from ppdiffusers import (
+        AutoencoderKL,
+        DDPMScheduler,
+        PNDMScheduler,
+        StableDiffusionPipeline,
+        UNet2DConditionModel,
+        patch_to,
+    )
+    from ppdiffusers.modeling_utils import freeze_params, unwrap_model
+    from ppdiffusers.optimization import get_scheduler
+    from ppdiffusers.pipelines.alt_diffusion import RobertaSeriesModelWithTransformation
+    from ppdiffusers.ppnlp_patch_utils import XLMRobertaTokenizer
+    from ppdiffusers.utils import PIL_INTERPOLATION
+
+    # patch
+    @patch_to(RobertaSeriesModelWithTransformation)
+    def get_input_embeddings(self):
+        return self.roberta.embeddings.word_embeddings
+
+
+    @patch_to(RobertaSeriesModelWithTransformation)
+    def set_input_embeddings(self, value):
+        self.roberta.embeddings.word_embeddings = value
+except:
+    AutoencoderKL = None
+    DDPMScheduler = None
+    PNDMScheduler = None
+    StableDiffusionPipeline = None
+    UNet2DConditionModel = None
+    patch_to = None
+    freeze_params, unwrap_model = None, None
+    get_scheduler = None
+    RobertaSeriesModelWithTransformation = None
+    XLMRobertaTokenizer = None
+    PIL_INTERPOLATION = None
 
 def get_writer(args):
     if args.writer_type == "visualdl":
         from visualdl import LogWriter
+
         writer = LogWriter(logdir=args.logging_dir)
     elif args.writer_type == "tensorboard":
         from tensorboardX import SummaryWriter
+
         writer = SummaryWriter(logdir=args.logging_dir)
     else:
         raise ValueError("writer_type must be in ['visualdl', 'tensorboard']")
@@ -162,6 +123,27 @@ def save_progress(text_encoder, placeholder_token_id, args, global_step=-1):
     print(
         f"Global_step: {global_step} 程序没有卡住，目前正在生成评估图片，请耐心等待！训练好的权重和评估图片将会自动保存到 {path} 目录下。")
 
+def generate_image(text_encoder, unet, vae, tokenizer, eval_scheduler, args):
+    text_encoder.eval()
+    temp_pipeline = StableDiffusionPipeline(
+        text_encoder=unwrap_model(text_encoder),
+        unet=unet,
+        vae=vae,
+        tokenizer=tokenizer,
+        scheduler=eval_scheduler,
+        safety_checker=None,
+        feature_extractor=None,
+        requires_safety_checker=False,
+    )
+    temp_pipeline.set_progress_bar_config(disable=True)
+    all_images = []
+    for _ in range(4):
+        all_images.append(
+            temp_pipeline(args.image_logging_prompt, height=args.height, width=args.width, output_type="numpy").images[0]
+        )
+    all_images = np.stack(all_images, axis=0)
+    text_encoder.train()
+    return all_images, temp_pipeline.numpy_to_pil(all_images)
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -171,6 +153,12 @@ def parse_args():
         type=int,
         default=10,
         help="Save learned_embeds.pdparams every X updates steps.",
+    )
+    parser.add_argument(
+        "--image_logging_prompt",
+        type=str,
+        default=None,
+        help="Logging image use which prompt.",
     )
     parser.add_argument(
         "--model_name",
@@ -304,9 +292,10 @@ def parse_args():
                         default=1e-08,
                         help="Epsilon value for the Adam optimizer")
     parser.add_argument("--max_grad_norm",
-                        default=1.0,
+                        default=-1,
                         type=float,
                         help="Max gradient norm.")
+    parser.add_argument("--language", default="en", choices=["en", "zh", "zh_en"], help="Model language.")
 
     parser.add_argument(
         "--logging_dir",
@@ -378,10 +367,46 @@ imagenet_style_templates_small = [
     "a large painting in the style of {}",
 ]
 
+zh_imagenet_templates_small = [
+    "一张{}的照片",
+    "{}的渲染",
+    "{}裁剪过的照片",
+    "一张干净的{}的照片",
+    "{}的黑暗照片",
+    "我的{}的照片",
+    "酷的{}的照片",
+    "{}的特写照片",
+    "{}的明亮照片",
+    "{}的裁剪照片",
+    "{}的照片",
+    "{}的好照片",
+    "一张{}的照片",
+    "干净的照片{}",
+    "一张漂亮的{}的照片",
+    "漂亮的照片{}",
+    "一张很酷的照片{}",
+    "一张奇怪的照片{}",
+]
 
+zh_imagenet_style_templates_small = [
+    "一幅{}风格的画",
+    "{}风格的渲染",
+    "{}风格的裁剪画",
+    "{}风格的绘画",
+    "{}风格的一幅干净的画",
+    "{}风格的黑暗画作",
+    "{}风格的图片",
+    "{}风格的一幅很酷的画",
+    "{}风格的特写画",
+    "一幅{}风格的明亮画作",
+    "{}风格的一幅好画",
+    "{}风格的特写画",
+    "{}风格的艺术画",
+    "一幅{}风格的漂亮画",
+    "一幅{}风格的奇怪的画",
+]
 
 class TextualInversionDataset(Dataset):
-
     def __init__(
         self,
         data_root,
@@ -395,6 +420,7 @@ class TextualInversionDataset(Dataset):
         set="train",
         placeholder_token="*",
         center_crop=False,
+        language="en",
     ):
         self.data_root = data_root
         self.tokenizer = tokenizer
@@ -405,11 +431,13 @@ class TextualInversionDataset(Dataset):
         self.center_crop = center_crop
         self.flip_p = flip_p
 
-        ext = ['png', 'jpg', 'jpeg', 'bmp']
+        if not Path(data_root).exists():
+            raise ValueError(f"{data_root} dir doesn't exists.")
+
+        ext = ["png", "jpg", "jpeg", "bmp", "PNG", "JPG", "JPEG", "BMP"]
         self.image_paths = []
         for e in ext:
-            self.image_paths.extend(glob.glob(os.path.join(data_root,
-                                                           '*.' + e)))
+            self.image_paths.extend(glob.glob(os.path.join(data_root, "*." + e)))
 
         self.num_images = len(self.image_paths)
         self._length = self.num_images
@@ -418,13 +446,23 @@ class TextualInversionDataset(Dataset):
             self._length = self.num_images * repeats
 
         self.interpolation = {
-            "linear": Resampling.BILINEAR,
-            "bilinear": Resampling.BILINEAR,
-            "bicubic": Resampling.BICUBIC,
-            "lanczos": Resampling.LANCZOS,
+            "linear": PIL_INTERPOLATION["linear"],
+            "bilinear": PIL_INTERPOLATION["bilinear"],
+            "bicubic": PIL_INTERPOLATION["bicubic"],
+            "lanczos": PIL_INTERPOLATION["lanczos"],
         }[interpolation]
 
-        self.templates = imagenet_style_templates_small if learnable_property == "style" else imagenet_templates_small
+        self.templates = []
+        if learnable_property == "style":
+            if "en" in language:
+                self.templates.extend(imagenet_style_templates_small)
+            if "zh" in language:
+                self.templates.extend(zh_imagenet_style_templates_small)
+        else:
+            if "en" in language:
+                self.templates.extend(imagenet_templates_small)
+            if "zh" in language:
+                self.templates.extend(zh_imagenet_templates_small)
         self.flip_transform = RandomHorizontalFlip(prob=self.flip_p)
 
     def __len__(self):
@@ -447,14 +485,6 @@ class TextualInversionDataset(Dataset):
             max_length=self.tokenizer.model_max_length,
         ).input_ids
 
-
-        example["input_ids_eval"] = self.tokenizer(
-            placeholder_string,
-            padding="do_not_pad",
-            truncation=True,
-            max_length=self.tokenizer.model_max_length,
-        ).input_ids
-        
         # default to score-sde preprocessing
         img = np.array(image).astype(np.uint8)
 
@@ -464,12 +494,10 @@ class TextualInversionDataset(Dataset):
                 img.shape[0],
                 img.shape[1],
             )
-            img = img[(h - crop) // 2:(h + crop) // 2,
-                      (w - crop) // 2:(w + crop) // 2]
+            img = img[(h - crop) // 2 : (h + crop) // 2, (w - crop) // 2 : (w + crop) // 2]
 
         image = Image.fromarray(img)
-        image = image.resize((self.width, self.height),
-                             resample=self.interpolation)
+        image = image.resize((self.width, self.height), resample=self.interpolation)
 
         image = self.flip_transform(image)
         image = np.array(image).astype(np.uint8)
@@ -477,11 +505,6 @@ class TextualInversionDataset(Dataset):
 
         example["pixel_values"] = image
         return example
-
-
-def freeze_params(params):
-    for param in params:
-        param.stop_gradient = True
 
 
 def main(args):
@@ -499,18 +522,16 @@ def main(args):
         os.makedirs(args.output_dir, exist_ok=True)
 
     # Load the tokenizer and add the placeholder token as a additional special token
-    if args.tokenizer_name:
-        tokenizer = CLIPTokenizer.from_pretrained(args.tokenizer_name)
-    elif args.model_name:
-        tokenizer = CLIPTokenizer.from_pretrained(
-            os.path.join(args.model_name, "tokenizer"))
-
+    try:
+        if args.tokenizer_name:
+            tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
+        elif args.pretrained_model_name_or_path:
+            tokenizer = AutoTokenizer.from_pretrained(os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
+    except:
+        tokenizer = XLMRobertaTokenizer.from_pretrained(os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
     # Add the placeholder token in tokenizer
     num_added_tokens = tokenizer.add_tokens(args.placeholder_token)
     if num_added_tokens == 0:
-        # raise ValueError(
-        #     f"The tokenizer already contains the token {args.placeholder_token}. Please pass a different"
-        #     " `placeholder_token` that is not already in the tokenizer.")
         raise ValueError(f"单词 {args.placeholder_token} 原本就已经存在了哦. 请用一个新的词汇.")
 
     # Convert the initializer_token, placeholder_token to ids
@@ -519,17 +540,24 @@ def main(args):
     # Check if initializer_token is a single token or a sequence of tokens
     if len(token_ids) > 1:
         # raise ValueError("The initializer token must be a single token.")
-        raise ValueError(
-            f"用来初始化的 ‘最接近的单词’ 只能是一个简单词, {args.initializer_token} 不可以哟.")
+        print(
+            f"用来初始化的 ‘最接近的单词’ 只能是一个简单词, {args.initializer_token} 不可以哟, 因此我们使用随机生成的单词！")
 
     initializer_token_id = token_ids[0]
+
     placeholder_token_id = tokenizer.convert_tokens_to_ids(
         args.placeholder_token)
 
     # Load models and create wrapper for stable diffusion
     if args.text_encoder is None:
-        text_encoder = CLIPTextModel.from_pretrained(
-            os.path.join(args.model_name, "text_encoder"))
+        # Load models and create wrapper for stable diffusion
+        if "Taiyi-Stable-Diffusion-1B-Chinese-v0.1" in args.pretrained_model_name_or_path:
+            model_cls = BertModel
+        if "AltDiffusion" in args.pretrained_model_name_or_path:
+            model_cls = RobertaSeriesModelWithTransformation
+        else:
+            model_cls = CLIPTextModel
+        text_encoder = model_cls.from_pretrained(os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
     else:
         text_encoder = args.text_encoder
 
@@ -547,23 +575,48 @@ def main(args):
     # Resize the token embeddings as we are adding new special tokens to the tokenizer
     text_encoder.resize_token_embeddings(len(tokenizer))
 
-    eval_scheduler = PNDMScheduler(beta_start=0.00085, beta_end=0.012,  beta_schedule='scaled_linear', skip_prk_steps=True)
-    eval_scheduler.set_timesteps(50)
+    noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
+    eval_scheduler = PNDMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
+
     # Initialise the newly added placeholder token with the embeddings of the initializer token
     with paddle.no_grad():
         token_embeds = text_encoder.get_input_embeddings()
-        token_embeds.weight[placeholder_token_id] = token_embeds.weight[
-            initializer_token_id]
+        if len(token_ids) == 1:
+            token_embeds.weight[placeholder_token_id] = token_embeds.weight[
+                initializer_token_id]
 
     # Freeze vae and unet
     freeze_params(vae.parameters())
     freeze_params(unet.parameters())
+
     # Freeze all parameters except for the token embeddings in text encoder
-    params_to_freeze = itertools.chain(
-        text_encoder.text_model.transformer.parameters(),
-        text_encoder.text_model.ln_final.parameters(),
-        text_encoder.text_model.positional_embedding.parameters(),
-    )
+    if isinstance(text_encoder, BertModel):
+        # bert text_encoder
+        params_to_freeze = itertools.chain(
+            text_encoder.encoder.parameters(),
+            text_encoder.pooler.parameters(),
+            text_encoder.embeddings.position_embeddings.parameters(),
+            text_encoder.embeddings.token_type_embeddings.parameters(),
+            text_encoder.embeddings.layer_norm.parameters(),
+        )
+    # Freeze all parameters except for the token embeddings in text encoder
+    elif isinstance(text_encoder, RobertaSeriesModelWithTransformation):
+        # roberta text_encoder
+        params_to_freeze = itertools.chain(
+            text_encoder.transformation.parameters(),
+            text_encoder.roberta.encoder.parameters(),
+            text_encoder.roberta.pooler.parameters(),
+            text_encoder.roberta.embeddings.position_embeddings.parameters(),
+            text_encoder.roberta.embeddings.token_type_embeddings.parameters(),
+            text_encoder.roberta.embeddings.layer_norm.parameters(),
+        )
+    else:
+        # clip text_encoder
+        params_to_freeze = itertools.chain(
+            text_encoder.text_model.transformer.parameters(),
+            text_encoder.text_model.ln_final.parameters(),
+            text_encoder.text_model.positional_embedding.parameters(),
+        )
     freeze_params(params_to_freeze)
 
     if args.scale_lr:
@@ -580,24 +633,17 @@ def main(args):
         args.gradient_accumulation_steps,
     )
 
-    if num_processes > 1:
-        text_encoder = paddle.DataParallel(text_encoder)
-
     # Initialize the optimizer
     optimizer = AdamW(learning_rate=lr_scheduler,
-                      parameters=unwrap_model(
-                          text_encoder).get_input_embeddings().parameters(),
+                      parameters=text_encoder.get_input_embeddings().parameters(),
                       beta1=args.adam_beta1,
                       beta2=args.adam_beta2,
                       weight_decay=args.adam_weight_decay,
                       epsilon=args.adam_epsilon,
-                      grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm)
-                      if args.max_grad_norm is not None else None)
+                      grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm) if args.max_grad_norm > 0 else None)
 
-    noise_scheduler = DDPMScheduler(beta_start=0.00085,
-                                    beta_end=0.012,
-                                    beta_schedule="scaled_linear",
-                                    num_train_timesteps=1000)
+    if num_processes > 1:
+        text_encoder = paddle.DataParallel(text_encoder)
 
     train_dataset = TextualInversionDataset(
         data_root=args.train_data_dir,
@@ -609,27 +655,19 @@ def main(args):
         learnable_property=args.learnable_property,
         center_crop=args.center_crop,
         set="train",
+        language=args.language,
     )
+
 
     def collate_fn(examples):
         input_ids = [example["input_ids"] for example in examples]
-        input_ids_eval = [example["input_ids_eval"] for example in examples]
-        pixel_values = paddle.to_tensor(
-            [example["pixel_values"] for example in examples], dtype="float32")
-        input_ids = tokenizer.pad({
-            "input_ids": input_ids
-        },
-                                  padding="max_length", max_length=tokenizer.model_max_length,
-                                  return_tensors="pd").input_ids
-        input_ids_eval = tokenizer.pad({
-            "input_ids": input_ids_eval
-        },
-                                  padding="max_length", max_length=tokenizer.model_max_length,
-                                  return_tensors="pd").input_ids
+        pixel_values = paddle.to_tensor([example["pixel_values"] for example in examples], dtype="float32")
+        input_ids = tokenizer.pad(
+            {"input_ids": input_ids}, padding="max_length", max_length=tokenizer.model_max_length, return_tensors="pd"
+        ).input_ids
         batch = {
             "input_ids": input_ids,
             "pixel_values": pixel_values,
-            "input_ids_eval": input_ids_eval,
         }
         return batch
 
@@ -659,27 +697,10 @@ def main(args):
                                       num_update_steps_per_epoch)
 
     if rank == 0:
-        # logger.info('-----------  Configuration Arguments -----------')
-        # for arg, value in sorted(vars(args).items()):
-        #     logger.info('%s: %s' % (arg, value))
-        # logger.info('------------------------------------------------')
         writer = get_writer(args)
 
     # Train!
-    total_batch_size = args.train_batch_size * args.gradient_accumulation_steps
-
-    # logger.info("***** Running training *****")
-    # logger.info(f"  Num examples = {len(train_dataset)}")
-    # logger.info(f"  Num Epochs = {args.num_train_epochs}")
-    # logger.info(
-    #     f"  Instantaneous batch size per device = {args.train_batch_size}")
-    # logger.info(
-    #     f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
-    # )
-    # logger.info(
-    #     f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
-    # logger.info(f"  Total optimization steps = {args.max_train_steps}")
-    # Only show the progress bar once on each machine.
+    total_batch_size = args.train_batch_size * args.gradient_accumulation_steps * num_processes
     progress_bar = tqdm(range(args.max_train_steps), disable=rank > 0)
     progress_bar.set_description("Train Steps")
     global_step = 0
@@ -694,33 +715,34 @@ def main(args):
     try:
         for epoch in range(args.num_train_epochs):
             for step, batch in enumerate(train_dataloader):
-                with paddle.no_grad():
-                    # Convert images to latent space
-                    latents = vae.encode(
-                        batch["pixel_values"]).latent_dist.sample()
-                    latents = latents * 0.18215
+                # Convert images to latent space
+                latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
+                latents = latents * 0.18215
 
-                    # Sample noise that we'll add to the latents
-                    noise = paddle.randn(latents.shape)
-                    batch_size = latents.shape[0]
-                    # Sample a random timestep for each image
-                    timesteps = paddle.randint(
-                        0, noise_scheduler.config.num_train_timesteps,
-                        (batch_size, )).astype("int64")
+                # Sample noise that we'll add to the latents
+                noise = paddle.randn(latents.shape)
+                batch_size = latents.shape[0]
+                # Sample a random timestep for each image
+                timesteps = paddle.randint(0, noise_scheduler.config.num_train_timesteps, (batch_size,), dtype="int64")
 
-                    # Add noise to the latents according to the noise magnitude at each timestep
-                    # (this is the forward diffusion process)
-                    noisy_latents = noise_scheduler.add_noise(
-                        latents, noise, timesteps)
+                # Add noise to the latents according to the noise magnitude at each timestep
+                # (this is the forward diffusion process)
+                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Get the text embedding for conditioning
                 encoder_hidden_states = text_encoder(batch["input_ids"])[0]
-                # Predict the noise residual
-                noise_pred = unet(noisy_latents, timesteps,
-                                  encoder_hidden_states).sample
+                # Predict the unet output
+                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
 
-                loss = F.mse_loss(noise_pred, noise,
-                                  reduction="none").mean([1, 2, 3]).mean()
+                # Get the target for loss depending on the prediction type
+                if noise_scheduler.config.prediction_type == "epsilon":
+                    target = noise
+                elif noise_scheduler.config.prediction_type == "v_prediction":
+                    target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                else:
+                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+
+                loss = F.mse_loss(model_pred, target, reduction="none").mean([1, 2, 3]).mean()
                 if args.gradient_accumulation_steps > 1:
                     loss = loss / args.gradient_accumulation_steps
                 loss.backward()
@@ -764,23 +786,8 @@ def main(args):
                         if global_step % args.save_steps == 0:
                             save_progress(text_encoder, placeholder_token_id,
                                           args, global_step)
-                            all_images = []
-                            loop = 4 if batch["input_ids_eval"].shape[0] == 1 else 1
-                            for i in range(loop):
-                                img = log_image(batch["input_ids_eval"], 
-                                                tokenizer=tokenizer,
-                                                vae = unwrap_model(vae),
-                                                eval_scheduler=eval_scheduler,
-                                                text_encoder=unwrap_model(text_encoder), 
-                                                unet=unwrap_model(unet))
-                                all_images.append(img)
-                            if len(all_images) > 1:
-                                all_images = np.concatenate(all_images, axis=0)
-                            else:
-                                all_images = all_images[0]
-                            writer.add_image("images", all_images,
-                                                    step=global_step,
-                                                    dataformats="NHWC")
+                            images, pil_images = generate_image(text_encoder, unet, vae, tokenizer, eval_scheduler, args)
+                            writer.add_image("images", images, step=global_step, dataformats="NHWC")
                             name = args.placeholder_token
                             name = name.translate({
                                 92: 95,
@@ -793,7 +800,7 @@ def main(args):
                                 62: 95,
                                 124: 95
                             })
-                            image_grid(all_images).save(os.path.join(args.output_dir, "step-"+str(global_step), f"{name}.jpg"))
+                            image_grid(pil_images).save(os.path.join(args.output_dir, "step-"+str(global_step), f"{name}.jpg"))
 
 
                 if global_step >= args.max_train_steps:
@@ -801,28 +808,19 @@ def main(args):
 
         if rank == 0:
             writer.close()
-            # # Create the pipeline using using the trained modules and save it.
-            # pipeline = StableDiffusionPipeline.from_pretrained(
-            #     args.model_name,
-            #     text_encoder=unwrap_model(text_encoder),
-            #     safety_checker=None,
-            #     tokenizer=tokenizer,
-            # )
-            # pipeline.save_pretrained(args.output_dir)
-            # Also save the newly trained embeddings
             save_progress(text_encoder, placeholder_token_id, args, global_step)
             print(f'训练完毕, 可以用新词 {args.placeholder_token} 去生成图片了.')
-
-            import gc
+            del text_encoder
+            del optimizer
+            del vae
+            del unet
+            del text_encoder_embedding_clone
             gc.collect()
-            paddle.device.cuda.empty_cache()
     except:
         save_progress(text_encoder, placeholder_token_id, args, global_step)
-        import gc
-        gc.collect()
         del text_encoder
         del optimizer
         del vae
         del unet
         del text_encoder_embedding_clone
-        paddle.device.cuda.empty_cache()
+        gc.collect()
