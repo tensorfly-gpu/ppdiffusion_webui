@@ -3,34 +3,10 @@
 
 import os
 os.environ['PPNLP_HOME'] = "./model_weights"
-model_name_list = [
-    "Linaqruf/anything-v3.0",
-    "MoososCap/NOVEL-MODEL", 
-    "Baitian/momocha",
-    "Baitian/momoco",
-    "hequanshaguo/monoko-e",
-    "ruisi/anything",
-    "hakurei/waifu-diffusion-v1-3", 
-    "CompVis/stable-diffusion-v1-4", 
-    "runwayml/stable-diffusion-v1-5", 
-    "stabilityai/stable-diffusion-2",
-    "stabilityai/stable-diffusion-2-base",
-    "hakurei/waifu-diffusion", 
-    "naclbit/trinart_stable_diffusion_v2_60k", 
-    "naclbit/trinart_stable_diffusion_v2_95k", 
-    "naclbit/trinart_stable_diffusion_v2_115k", 
-    "ringhyacinth/nail-set-diffuser",
-    "Deltaadams/Hentai-Diffusion",
-    "BAAI/AltDiffusion",
-    "BAAI/AltDiffusion-m9",
-    "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1",
-    "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1",
-    "huawei-noah/Wukong-Huahua"]
-
 import time
 from IPython.display import clear_output, display
 from .png_info_helper import serialize_to_pnginfo, imageinfo_to_pnginfo
-
+from .views import createView
 
 from .env import DEBUG_UI
 
@@ -234,8 +210,8 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
         
         layoutCol12 = Layout(
             flex = "12 12 90%",
-            margin = "0.5em",
-            max_width = "100%",
+            margin = "0.375rem",
+            max_width = "calc(100% - 0.75rem)",
             align_items = "center"
         )
         styleDescription = {
@@ -331,13 +307,10 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
             step=100,
             disabled=False
         )
-        widget_opt['model_name'] = widgets.Combobox(
-            layout=layoutCol12, style=styleDescription,
-            description='需要训练的模型名称',
-            value="MoososCap/NOVEL-MODEL",
-            options=model_name_list,
-            ensure_option=False,
-            disabled=False
+        widget_opt['model_name'] = createView(
+            'model_name',
+            layout_name='col12', style=styleDescription,
+            description='训练所使用模型的名称（清空输入框以显示更多模型）',
         )
         
         for key in widget_opt:

@@ -13,18 +13,18 @@ from ipywidgets import (
 from .utils import collect_local_module_names
 
 model_name_list = [
-    "Linaqruf/anything-v3.0",
     "MoososCap/NOVEL-MODEL", 
+    "ruisi/anything",
+    "Linaqruf/anything-v3.0",
     "Baitian/momocha",
     "Baitian/momoco",
     "hequanshaguo/monoko-e",
-    "ruisi/anything",
+    "hakurei/waifu-diffusion", 
     "hakurei/waifu-diffusion-v1-3", 
     "CompVis/stable-diffusion-v1-4", 
     "runwayml/stable-diffusion-v1-5", 
     "stabilityai/stable-diffusion-2",
     "stabilityai/stable-diffusion-2-base",
-    "hakurei/waifu-diffusion", 
     "naclbit/trinart_stable_diffusion_v2_60k", 
     "naclbit/trinart_stable_diffusion_v2_95k", 
     "naclbit/trinart_stable_diffusion_v2_115k", 
@@ -36,7 +36,7 @@ model_name_list = [
     "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1",
     "huawei-noah/Wukong-Huahua"]
 
-samler_list = [
+sampler_list = [
     "default",
     "DPMSolver",
     "EulerDiscrete",
@@ -226,7 +226,7 @@ _Views = {
         "style": _description_style,
         "description": '采样器',
         "value": 'default',
-        "options": samler_list, 
+        "options": sampler_list, 
     },
     "standard_size": {
         "__type": 'Dropdown',
@@ -266,7 +266,7 @@ _Views = {
         "layout_name": 'col08',
         "style": _description_style,
         "description": '模型名称',
-        "description_tooltip": '需要加载的模型名称',
+        "description_tooltip": '需要加载的模型名称（清空输入框以显示更多模型）',
         "value": 'MoososCap/NOVEL-MODEL',
         "options": model_name_list,
         "ensure_option": False,
@@ -531,14 +531,14 @@ def _create_WHView(width_value = 512, height_value = 512):
         layout=_layout,
         value=width_value,
         min=64,
-        max=1088,
+        max=1280,
         step=64,
     )
     w_height = BoundedIntText(
         layout=_layout,
         value=height_value,
         min=64,
-        max=1088,
+        max=1280,
         step=64,
     )
     
