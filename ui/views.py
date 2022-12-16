@@ -531,27 +531,27 @@ def _create_WHView(width_value = 512, height_value = 512):
         layout=_layout,
         value=width_value,
         min=64,
-        max=1280,
-        step=64,
+        max=1440,
+        step=16,
     )
     w_height = BoundedIntText(
         layout=_layout,
         value=height_value,
         min=64,
-        max=1280,
-        step=64,
+        max=1440,
+        step=16,
     )
     
     def validate(change):
-        num = change.new % 64
+        num = change.new % 8
         if change.new < 64:
             change.owner.value = 64
         elif num == 0:
             pass
-        elif num < 32:
+        elif num < 4:
             change.owner.value = change.new - num
         else:
-            change.owner.value = change.new - num + 64
+            change.owner.value = change.new - num + 8
     w_width.observe(validate,names = 'value')
     w_height.observe(validate,names = 'value')
         
@@ -563,7 +563,6 @@ def _create_WHView(width_value = 512, height_value = 512):
                 flex='0 0 auto',
                 padding='0 0.75rem'
             ),
-           # description_tooltip = '图片尺寸' if not step64 else '图片尺寸（-1为自动判断）'
         ),
         w_height,
     ])
@@ -669,11 +668,15 @@ def Div(children = None, **kwargs):
 
 def FlexBox(children = None, **kwargs):
     if children is not None: kwargs['children'] = children
+    
+    layout = kwargs['layout'] if 'layout' in kwargs else Layout()
+    layout.display = 'flex'
+    layout.flex_flow = 'row wrap'# HBox覆写nowrap，Box默认nowrap
+    layout.max_width = layout.max_width or '100%'
+    layout.align_items = layout.align_items or 'center'
+    layout.align_content = layout.align_content or 'center'
+    layout.justify_content = layout.justify_content or 'center'
+    kwargs['layout'] = layout
     box = Box(**kwargs)
-    box.layout.display = 'flex'
-    box.layout.flex_flow = 'row wrap' # HBox覆写nowrap，Box默认nowrap
-    box.layout.justify_content = 'space-around'  #注意覆写
-    box.layout.align_items = 'center',
-    box.layout.align_content = 'center',
     return box
     

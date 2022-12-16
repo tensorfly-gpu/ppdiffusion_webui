@@ -1,6 +1,6 @@
-from datetime import datetime
 import os
 import shutil
+import time
 from .ui import StableDiffusionUI
 from .utils import save_image_info
 from .png_info_helper import deserialize_from_filename, InfoFormat
@@ -437,7 +437,7 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
         
     def on_collect_button_click(self, b):
         with self.run_button_out:
-            dir = datetime.now().strftime(f'Favorates/{self.task}-%m%d/') 
+            dir = time.strftime(f'Favorates/{self.task}-%m%d/') 
             info = '收藏图片到 ' + dir
             dir = './' + dir
             os.makedirs(dir, exist_ok=True)

@@ -312,14 +312,24 @@ def deserialize_from_image(image):
     # [Paddle]
     return _collect_from_pnginfo(image.info)
     
+def deserialize_from_textfile(txt_path):
+    """ 从文本文件获取参数信息。参数为文件地址。"""
+    assert os.path.isfile(txt_path), f'文件不存在：{txt_path}'
+    
+    with open(txt_path, 'r') as f:
+        return _deserialize_from_lines(f)
+    
 def deserialize_from_filename(filename):
     """ 从文本文件或图像文件获取参数信息，优先从其对应的文本文件中提取。参数为文件地址。"""
     txt_path, dot, ext = filename.rpartition('.')
+    if ext.lower() == 'txt':
+        return deserialize_from_textfile(filename)
+        
     txt_path += '.txt'
     if os.path.isfile(txt_path):
         with open(txt_path, 'r') as f:
             (dict,fmt) = _deserialize_from_lines(f)
-            if (fmt is not InfoFormat.Unknown) or ext.lower() == 'txt':
+            if (fmt is not InfoFormat.Unknown):
                 return (dict, fmt)
     
     return deserialize_from_image(filename)
