@@ -173,8 +173,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
                 if os.path.isfile(image_path):
                     shutil.move(image_path, dir)
                     print(info + os.path.basename(image_path))
-                txt_file, dot, ext = image_path.rpartition('.')
-                txt_file += '.txt'
+                txt_file = image_path.rpartition('.')[0] + '.txt'
                 if os.path.isfile(txt_file):
                     shutil.move(txt_file, dir)
             self._output_collections.clear()
@@ -357,8 +356,7 @@ class OutputImageView():
         # 转移文件
         shutil.move(image_path, dir)
         print(info + image_name)
-        txt_file, dot, ext = image_path.rpartition('.')
-        txt_file += '.txt'
+        txt_file = image_path.rpartition('.')[0] + '.txt'
         if os.path.isfile(txt_file):
             shutil.move(txt_file, dir)
         

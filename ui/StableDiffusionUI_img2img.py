@@ -545,10 +545,7 @@ def _createUploadView(
     
     def reset():
         input.value = default_path
-        try:
-            upload.value = ()
-        except:
-            pass
+        upload.value.clear()
     
     def confirm():
         # 【注意】v8.0与7.5的value结构不同
@@ -557,9 +554,9 @@ def _createUploadView(
             #检查文件类型
             path = upload_path
             if dict['metadata']['type'] == 'image/jpeg':
-                path = upload_path.partition('.')[0] + '.jpg'
+                path = upload_path.rpartition('.')[0] + '.jpg'
             elif dict['metadata']['type'] == 'image/png':
-                path = upload_path.partition('.')[0] + '.png'
+                path = upload_path.rpartition('.')[0] + '.png'
             print('保存上传到：'+path)
             with open(path, 'wb') as file:
                 file.write(dict['content'])
