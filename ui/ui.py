@@ -430,13 +430,10 @@ class StableDiffusionUI_dreambooth(StableDiffusionDreamboothUI):
         }
 
         widget_opt = self.widget_opt
-        widget_opt['pretrained_model_name_or_path'] = widgets.Combobox(
-            layout=layoutCol12, style=styleDescription,
-            description='需要训练的模型名称',
-            value="MoososCap/NOVEL-MODEL",
-            options=model_name_list,
-            ensure_option=False,
-            disabled=False
+        widget_opt['pretrained_model_name_or_path'] = createView(
+            'model_name',
+            layout_name='col12', style=styleDescription,
+            description='训练所使用模型的名称（清空输入框以显示更多模型）',
         )
         widget_opt['instance_data_dir'] = widgets.Text(
             layout=layoutCol12, style=styleDescription,
@@ -596,9 +593,6 @@ class StableDiffusionUI_dreambooth(StableDiffusionDreamboothUI):
             if (key in args) and (args[key] != widget_opt[key].value):
                 widget_opt[key].value = args[key]
 
-               
-        
-       
         
         self.run_button = widgets.Button(
             description='开始训练',
