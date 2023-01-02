@@ -1,3 +1,4 @@
+#pt加载功能基于群内@作者版本修改 
 import os 
 import time
 from contextlib import nullcontext, contextmanager
@@ -81,7 +82,7 @@ def package_install(verbose = True):
     except (ModuleNotFoundError, ImportError, AttributeError):
         if verbose: print('检测到库不完整, 正在安装库')
         os.system("pip install -U pip  -i https://mirror.baidu.com/pypi/simple")
-        os.system("pip install -U ppdiffusers paddlenlp --user")
+        os.system("pip install -U ppdiffusers paddlenlp OmegaConf --user")
         clear_output()
 
 def diffusers_auto_update(verbose = True):
@@ -147,6 +148,57 @@ def ReadImage(image, height = None, width = None):
     if (height is not None) and (width is not None) and (w != width or h != height):
         image = image.resize((width, height), Image.ANTIALIAS)
     return image
+    
+def convert_pt_to_pdparams(path, dim = 768, save = True):
+    """Unsafe .pt embedding to .pdparams."""
+    path = str(path)
+    assert path.endswith('.pt'), 'Only support conversion of .pt files.'
+
+    import struct
+    with open(path, 'rb') as f:
+        data = f.read()
+    data = ''.join(chr(i) for i in data)
+
+    # locate the tensor in the file
+    tensors = []
+    for chunk in data.split('ZZZZ'):
+        chunk = chunk.strip('Z').split('PK')
+        if len(chunk) == 0:
+            continue
+
+        tensor = ''
+        for i in range(len(chunk)):
+            # extract the string with length 768 * (4k)
+            tensor += 'PK' + chunk[i]
+            if len(tensor) > 2 and len(tensor) % (dim * 4) == 2:
+                # remove the leading 'PK'
+                tensors.append(tensor[2:])
+
+    tensor = max(tensors, key = lambda x: len(x))
+
+    # convert back to binary representation
+    tensor = tensor.encode('latin')
+
+    # every four chars represent a float32
+    tensor = [struct.unpack('f', tensor[i:i+4])[0] for i in range(0, len(tensor), 4)]
+    tensor = paddle.to_tensor(tensor).reshape((-1, dim))
+    if tensor.shape[0] == 1:
+        tensor = tensor.flatten()
+
+    if save:
+        # locate the name of embedding
+        name = ''.join(filter(lambda x: ord(x) > 20, data.split('nameq\x12X')[1].split('q\x13X')[0]))
+        paddle.save({name: tensor}, path[:-3] + '.pdparams')
+
+    return tensor
+
+def get_multiple_tokens(token, num = 1, ret_list = True):
+    """Parse a single token to multiple tokens."""
+    tokens = ['%s_EMB_TOKEN_%d'%(token, i) for i in range(num)]
+    if ret_list:
+        return tokens
+    return ' '.join(tokens)
+
 
 def collect_local_module_names(base_paths = None):
     """从指定位置检索可用的模型名称，以用于UI选择模型"""
@@ -275,7 +327,16 @@ class StableDiffusionFriendlyPipeline():
 
             path = Path(opt.concepts_library_dir)
             if path.exists():
+                #file_paths = path.glob("*.pdparams")
                 file_paths = [p for p in path.glob("*.pdparams")]
+
+                # conversion of .pt -> .pdparams embedding
+                pt_files = path.glob("*.pt")
+                for pt_file in pt_files:
+                    try:
+                        convert_pt_to_pdparams(pt_file, dim = 768, save = True)
+                    except:
+                        pass
             
             if opt.concepts_library_dir.endswith('.pdparams') and os.path.exists(opt.concepts_library_dir): 
                 # load single file
@@ -287,18 +348,24 @@ class StableDiffusionFriendlyPipeline():
                 # load the token safely in float32
                 original_dtype = self.pipe.text_encoder.dtype
                 self.pipe.text_encoder = self.pipe.text_encoder.to(dtype = 'float32')
-
+                self.added_tokens = []
                 for p in file_paths:
                     for token, embeds in paddle.load(str(p)).items():
-                        self.pipe.tokenizer.add_tokens(token)
-                        self.pipe.text_encoder.resize_token_embeddings(len(self.pipe.tokenizer))
-                        token_id = self.pipe.tokenizer.convert_tokens_to_ids(token)
-                        with paddle.no_grad():
-                            has_updated = True
-                            self.pipe.text_encoder.get_input_embeddings().weight[token_id] = embeds
                         added_tokens.append(token)
-                        if token not in self.added_tokens:
-                            self.added_tokens.append(token)
+                        if embeds.dim() == 1:
+                            embeds = embeds.reshape((1, -1))
+                        tokens = get_multiple_tokens(token, embeds.shape[0], ret_list = True)
+                        self.added_tokens.append((token, ' '.join(tokens)))
+
+                        for token, embed in zip(tokens, embeds):
+                            self.pipe.tokenizer.add_tokens(token)
+                            self.pipe.text_encoder.resize_token_embeddings(len(self.pipe.tokenizer))
+                            token_id = self.pipe.tokenizer.convert_tokens_to_ids(token)
+                            with paddle.no_grad():
+                                if paddle.max(paddle.abs(self.pipe.text_encoder.get_input_embeddings().weight[token_id] - embed)) > 1e-4:
+                                    # only add / update new token if it has changed
+                                    has_updated = True
+                                    self.pipe.text_encoder.get_input_embeddings().weight[token_id] = embed
                             
 
         if is_exist_concepts_library_dir:
@@ -309,8 +376,9 @@ class StableDiffusionFriendlyPipeline():
             print(f"[导入训练文件] {opt.concepts_library_dir} 文件夹下没有发现任何文件，跳过加载！")
         
         if self.added_tokens:
-            self_str_added_tokens = ", ".join(self.added_tokens)
-            print(f"[支持的'风格'或'人物'单词]: {self_str_added_tokens} ")
+            #self_str_added_tokens = ", ".join((self.added_tokens))
+            str_added_tokens = ", ".join(added_tokens)
+            print(f"[支持的'风格'或'人物'单词]: {str_added_tokens} ")
         if original_dtype is not None:
             self.pipe.text_encoder = self.pipe.text_encoder.to(dtype = original_dtype)
     
@@ -336,6 +404,9 @@ class StableDiffusionFriendlyPipeline():
             negative_prompt = negative_prompt.translate({40:123, 41:125, 123:40, 125:41})
         elif '()' in opt.enable_parsing:
             enable_parsing = True
+        for token in self.added_tokens:
+            prompt = prompt.replace(token[0], token[1])
+            negative_prompt = negative_prompt.replace(token[0], token[1])
         
         
         init_image = None

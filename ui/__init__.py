@@ -17,9 +17,10 @@ else:
     
     from .ui import (
         StableDiffusionUI_text_inversion,
-        
+        StableDiffusionUI_dreambooth,
         pipeline_superres,
         pipeline,
+        StableDiffusionUI_convert,
     )
     from .StableDiffusionUI_txt2img import StableDiffusionUI_txt2img
     from .StableDiffusionUI_img2img import StableDiffusionUI_img2img
@@ -41,5 +42,11 @@ else:
     )
     gui_text_inversion = StableDiffusionUI_txt2img(
         **config['text_inversion']
+    )
+    gui_dreambooth = StableDiffusionUI_dreambooth( #dreamboothUI
+        **config['dreambooth']
+    )
+    gui_convert = StableDiffusionUI_convert(
+        **config['convert']
     )
     gui_inpaint = gui_img2img

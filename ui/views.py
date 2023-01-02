@@ -1,3 +1,4 @@
+
 from traitlets import Bunch
 import ipywidgets
 from ipywidgets import (
@@ -162,7 +163,7 @@ _Views = {
         "description_tooltip": '推理步数（Step）：生成图片的迭代次数，步数越多运算次数越多。',
         "value": 50,
         "min": 2,
-        "max": 250,
+        "max": 10000,
     },
     "num_return_images": {
         "__type": 'BoundedIntText',

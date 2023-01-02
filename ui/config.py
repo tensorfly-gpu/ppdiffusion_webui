@@ -54,6 +54,31 @@ config = {
         "negative_prompt": '',
         "output_dir": 'outputs/text_inversion_txt2img',
     },
+    "dreambooth": {                    #Dreambooth配置段
+        "pretrained_model_name_or_path": "MoososCap/NOVEL-MODEL",
+        "instance_data_dir": 'resources/Alices',
+        "instance_prompt": 'a photo of Alices',
+        "class_data_dir": 'resources/Girls',
+        "class_prompt": 'a photo of girls',
+        "num_class_images": 100,
+        "prior_loss_weight": 1.0,
+        "with_prior_preservation": True,
+        #"num_train_epochs": 1,
+        "max_train_steps": 1000,
+        "save_steps": 1000,
+        "train_text_encoder": False,
+        "height": 512,
+        "width": 512,
+        "learning_rate": 5e-6,
+        "lr_scheduler": "constant",
+        "lr_warmup_steps": 500,
+        "center_crop": True,
+        "output_dir": 'outputs/dreambooth',
+    },
+    "convert": {
+        "checkpoint_path": '',
+        'dump_path': 'outputs/convert'
+    },
 }
 
 try:
