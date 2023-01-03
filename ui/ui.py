@@ -733,3 +733,12 @@ class StableDiffusionUI_convert(StableDiffusionConvertUI):
             ], layout = Layout(display="block",margin="0 45px 0 0")
         )
 
+    def on_run_button_click(self, b):
+        with self.run_button_out:
+            self.run_button.disabled = True
+            clear_output()
+            try:
+                print('开始处理...')
+                self.run(get_widget_extractor(self.widget_opt))
+            finally:
+                self.run_button.disabled = False
