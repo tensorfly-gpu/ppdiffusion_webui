@@ -78,22 +78,25 @@ _DefaultLayout = {
         'align_items':  "center"
     },
     'btnV5': {}, #见css
+    'widget-wrap': {}, #见css
 }
 
 # 为工具设置布局，并标记dom class
-def setLayout(layout_name, widget):
-    _lists = layout_name if isinstance(layout_name, list) else [layout_name]
+def setLayout(layout_names, widget):
+    _lists = layout_names if isinstance(layout_names, list) or \
+        isinstance(layout_names, tuple) \
+        else (layout_names,)
     
     for name in _lists:
-        if layout_name not in _DefaultLayout: 
-            raise Exception(f'未定义的layout名称：{layout_name}')
+        if name not in _DefaultLayout: 
+            raise Exception(f'未定义的layout名称：{name}')
         
-        styles = _DefaultLayout[layout_name];
+        styles = _DefaultLayout[name];
         
         for key in styles:
             setattr(widget.layout, key, styles[key])
         
-        widget.add_class(layout_name)
+        widget.add_class(name)
     
 _description_style = { 'description_width': "4rem" }
 _Views = {
@@ -293,6 +296,15 @@ _Views = {
         "icon": 'star-o',
         "disabled": True,
     },
+    "train_button": {
+        "__type": 'Button',
+        "class_name": 'run_button',
+        "layout_name": 'btnV5',
+        "button_style": 'success', # 'success', 'info', 'warning', 'danger' or ''
+        "description": '开始训练！',
+        "tooltip": '单击开始训练任务',
+        "icon": 'check'
+    },
     
     # Box
     "box_gui": {
@@ -335,7 +347,7 @@ SHARED_STYLE_SHEETS = '''
         width: 100% !important;
         text-align: left !important;
         font-size: small !important;
-    }
+    } /* TODO: 合并为.widget-wrap-sm */
     {root} .col04,
     {root} .col06 {
         /*手机9rem会换行*/
@@ -348,6 +360,16 @@ SHARED_STYLE_SHEETS = '''
 {root} .widget-text > label,
 {root} .widget-text > .widget-label {
     user-select: none;
+}
+
+/* 控件换行 */
+{root} .widget-wrap {
+    flex-wrap: wrap !important;
+    height: auto;
+}
+{root} .widget-wrap > label {
+    width: 100% !important;
+    text-align: left !important;
 }
 
 /* bootcss v5 */

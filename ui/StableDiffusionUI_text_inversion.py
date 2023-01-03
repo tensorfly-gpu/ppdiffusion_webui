@@ -1,12 +1,12 @@
 import os
+import ipywidgets as widgets
+from collections import OrderedDict
+from IPython.display import clear_output
 from .ui import pipeline, get_widget_extractor
+from .utils import compute_gpu_memory, empty_cache
 from .textual_inversion import parse_args as textual_inversion_parse_args
 from .textual_inversion import main as textual_inversion_main
-
-from IPython.display import clear_output, display
-import ipywidgets as widgets
-from ipywidgets import Layout,HBox,VBox,Box
-from . import views
+from .views import createView, setLayout, SHARED_STYLE_SHEETS
 
 ####################################################################
 #
@@ -24,10 +24,10 @@ class StableDiffusionTrainUI():
 
         # function pointers
         #self.parse_args = None #Test
-        self.main = None
+        #self.main = None
 
     def run(self, opt):
-        args = self.parse_args()
+        args = textual_inversion_parse_args()
         for k, v in opt.items():
             setattr(args, k, v.value)
 
@@ -67,7 +67,7 @@ class StableDiffusionTrainUI():
         name = name.translate({92: 95, 47: 95, 42: 95, 34: 95, 58: 95, 63: 95, 60: 95, 62: 95, 124: 95})
         args.logging_dir  = os.path.join(args.output_dir, 'logs', name)
 
-        self.main(args)
+        textual_inversion_main(args)
         empty_cache()
         
     def on_run_button_click(self, b):
@@ -78,8 +78,13 @@ class StableDiffusionTrainUI():
 class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
     def __init__(self, **kwargs):
         super().__init__()
-        self.parse_args = textual_inversion_parse_args
-        self.main = textual_inversion_main
+        
+        CLASS_NAME = self.__class__.__name__ \
+                + '_{:X}'.format(hash(self))[-4:]
+        
+        STYLE_SHEETS = '''
+
+'''
         
         #默认参数覆盖次序：
         #user_config.py > config.py > 当前args > 实例化
@@ -99,130 +104,109 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
         }
         args.update(kwargs)
         
-        layoutCol12 = Layout(
-            flex = "12 12 90%",
-            margin = "0.375rem",
-            max_width = "calc(100% - 0.75rem)",
-            align_items = "center"
-        )
-        styleDescription = {
-            'description_width': "10rem"
-        }
-        
         widget_opt = self.widget_opt
         widget_opt['learnable_property'] = widgets.Dropdown(
-            layout=layoutCol12, style=styleDescription,
             description='训练目标',
             description_tooltip='训练目标是什么？风格还是实体？',
-            value="object",
             options=[
                 ('风格（style）',  "style"),
                 ('实体（object）', "object"),
             ],
-            orientation='horizontal',
-            disabled=False
         )
         widget_opt['placeholder_token'] = widgets.Text(
-            layout=layoutCol12, style=styleDescription,
             description='用来表示该内容的新词',
             description_tooltip='用来表示该内容的新词，建议用<>封闭',
-            value="<Alice>",
-            disabled=False
         )
         widget_opt['initializer_token'] = widgets.Text(
-            layout=layoutCol12, style=styleDescription,
             description='该内容最接近的单词是',
             description_tooltip='该内容最接近的单词是？若无则用*表示',
-            value="girl",
-            disabled=False
         )
         widget_opt['repeats'] = widgets.IntText(
-            layout=layoutCol12, style=styleDescription,
             description='图片重复次数',
             description_tooltip='训练图片需要重复多少遍',
-            value="100",
-            disabled=False
         )
         widget_opt['train_data_dir'] = widgets.Text(
-            layout=layoutCol12, style=styleDescription,
             description='训练图片的文件夹路径',
-            value="resources/Alices",
-            disabled=False
         )
         widget_opt['output_dir'] = widgets.Text(
-            layout=layoutCol12, style=styleDescription,
             description='训练结果的保存路径',
-            value="outputs/textual_inversion",
-            disabled=False
         )
         widget_opt['height'] = widgets.IntSlider(
-            layout=layoutCol12, style=styleDescription,
             description='训练图片的高度',
             description_tooltip='训练图片的高度。越大尺寸，消耗的显存也越多。',
             value=512,
             min=64,
             max=1024,
             step=64,
-            disabled=False
         )
         widget_opt['width'] = widgets.IntSlider(
-            layout=layoutCol12, style=styleDescription,
             description='训练图片的宽度',
             description_tooltip='训练图片的宽度。越大尺寸，消耗的显存也越多。',
             value=512,
             min=64,
             max=1024,
             step=64,
-            disabled=False
         )
         widget_opt['learning_rate'] = widgets.FloatText(
-            layout=layoutCol12, style=styleDescription,
             description='训练学习率',
             description_tooltip='训练学习率',
             value=5e-4,
             step=1e-4,
-            disabled=False
         )
         widget_opt['max_train_steps'] = widgets.IntText(
-            layout=layoutCol12, style=styleDescription,
             description='最大训练步数',
             description_tooltip='最大训练步数',
             value=1000,
             step=100,
-            disabled=False
         )
         widget_opt['save_steps'] = widgets.IntText(
-            layout=layoutCol12, style=styleDescription,
             description='每隔多少步保存模型',
             value=200,
             step=100,
-            disabled=False
         )
         widget_opt['model_name'] = createView(
             'model_name',
-            layout_name='col12', style=styleDescription,
+            layout_name='col12',
             description='训练所使用模型的名称（清空输入框以显示更多模型）',
         )
         
+        _col12 = (
+            # 'learnable_property',
+            # 'initializer_token',
+            # 'placeholder_token',
+            # 'train_data_dir',
+            'output_dir',
+            'model_name',
+        )
         for key in widget_opt:
+            if key in _col12:
+                setLayout(('col12','widget-wrap'), widget_opt[key])
+            else:
+                setLayout(('col06','widget-wrap'), widget_opt[key])
             if (key in args) and (args[key] != widget_opt[key].value):
                 widget_opt[key].value = args[key]
         
-        self.run_button = widgets.Button(
-            description='开始训练',
-            disabled=False,
-            button_style='success', # 'success', 'info', 'warning', 'danger' or ''
-            tooltip='点击运行（配置将自动更新）',
-            icon='check'
-        )
+        # 按钮
+        self.run_button = createView('train_button')
         self.run_button.on_click(self.on_run_button_click)
         
-        self.gui = Box([
-                Box([
+        # 样式表
+        STYLE_SHEETS = ('<style>' \
+                + SHARED_STYLE_SHEETS \
+                + STYLE_SHEETS \
+                + '</style>'
+            ).replace('{root}', '.' + CLASS_NAME)
+        
+        self.gui = createView("box_gui", 
+            class_name = CLASS_NAME,
+            children = [
+                widgets.HTML(STYLE_SHEETS),
+                createView("box_main", 
+                [
                     widget_opt['learnable_property'],
+                    widget_opt['train_data_dir'],
                     widget_opt['placeholder_token'],
                     widget_opt['initializer_token'],
-                    widget_opt['train_data_dir'],
                     widget_opt['width'],
                     widget_opt['height'],
                     widget_opt['repeats'],
@@ -231,15 +215,9 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
                     widget_opt['save_steps'],
                     widget_opt['model_name'],
                     widget_opt['output_dir'],
-                    
-                ], layout = Layout(
-                    display = "flex",
-                    flex_flow = "row wrap", #HBox会覆写此属性
-                    align_items = "center",
-                    max_width = '100%',
-                )),
+                ]),
                 self.run_button, 
                 self.run_button_out
-            ], layout = Layout(display="block",margin="0 45px 0 0")
+            ],
         )
 
