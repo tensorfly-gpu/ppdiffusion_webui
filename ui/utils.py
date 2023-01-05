@@ -243,6 +243,36 @@ def collect_local_module_names(base_paths = None):
     sorted(models)
     return models
 
+def collect_local_ckpts(base_paths = None):
+    if base_paths is None:
+        base_paths = [
+            './',
+            './ckpt/',
+        ] + [os.path.join('./data', x) for x in os.listdir('./data')]
+    elif isinstance(base_paths, str):
+        base_paths = [base_paths,]
+        
+    models = []
+    for base_path in base_paths:
+        if not os.path.isdir(base_path): continue
+        for name in os.listdir(base_path):
+            if name.startswith('.'): continue
+            
+            path = os.path.join(base_path, name)
+            
+            if path in base_paths: continue
+            if os.path.isdir(path): pass
+            elif os.path.isfile(path) and name.endswith('.ckpt'):    #不考虑大小写问题
+                models.append(path)
+                continue
+            else:
+                continue
+            
+            for name2 in os.listdir(path):
+                if os.path.isfile(path) and name.endswith('.ckpt'):
+                    models.append(path)
+    return models
+    
     
 class StableDiffusionFriendlyPipeline():
     def __init__(self, model_name = "runwayml/stable-diffusion-v1-5", superres_pipeline = None):

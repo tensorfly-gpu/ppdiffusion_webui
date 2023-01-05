@@ -20,8 +20,10 @@ if not DEBUG_UI:
     from .utils import StableDiffusionFriendlyPipeline, SuperResolutionPipeline, diffusers_auto_update
     from .utils import compute_gpu_memory, empty_cache
     from .utils import save_image_info
+    from .utils import collect_local_ckpts
     from .convert import parse_args as convert_parse_args
     from .convert import main as convert_parse_main
+    from .views import createView
 
     #_ENABLE_ENHANCE = False
 
@@ -115,6 +117,8 @@ class StableDiffusionUI():
             print('Seed = ', image.argument['seed'], 
                 '    (%d / %d ... %.2f%%)'%(count + 1, total, (count + 1.) / total * 100))
 
+
+
 #####################################
 #M0DE1 C0NVERT
 ##############################
@@ -127,32 +131,32 @@ class StableDiffusionConvertUI():
         self.pipeline = pipeline
 
         # function pointers
-        self.parse_args = None
-        self.main = None
+        # self.parse_args = None
+        # self.main = None
 
     def run(self, opt):
-        args = self.parse_args()
+        args = convert_parse_args()
         for k, v in opt.items():
             setattr(args, k, v.value)
 
         if args.checkpoint_path is None:
             raise ValueError("你必须给出一个可用的ckpt模型路径")
-        self.main(args)
+        convert_parse_main(args)
         empty_cache()
         
-    def on_run_button_click(self, b):
-        with self.run_button_out:
-            clear_output()
-            self.run(get_widget_extractor(self.widget_opt))
+    # def on_run_button_click(self, b):
+        # with self.run_button_out:
+            # clear_output()
+            # self.run(get_widget_extractor(self.widget_opt))
 
 class StableDiffusionUI_convert(StableDiffusionConvertUI):
     def __init__(self, **kwargs):
         super().__init__()
-        self.parse_args = convert_parse_args #配置加载
-        self.main = convert_parse_main
         args = {  #注意无效Key错误
-            "checkpoint_path": '',
-            'dump_path': 'outputs/convert'
+            # "checkpoint_path": '',
+            "model_root": 'models/',
+            "scheduler_type": 'pndm',
+            "extract_ema": False,
         }
         args.update(kwargs)
         
@@ -167,57 +171,87 @@ class StableDiffusionUI_convert(StableDiffusionConvertUI):
         }
 
         widget_opt = self.widget_opt
-        widget_opt['checkpoint_path'] = widgets.Text(
+        widget_opt['extract_ema'] = widgets.Dropdown(
+            layout=layoutCol12, style=styleDescription,
+            description='提取Ema权重',
+            description_tooltip = """Only relevant for checkpoints that have both EMA and non-EMA weights. Whether to extract the EMA weights
+EMA weights usually yield higher quality images for inference.
+Non-EMA weights are usually better to continue fine-tuning.""",
+            options=[
+                ('开启',  True),
+                ('关闭',  False),
+            ],
+        )
+        widget_opt['scheduler_type'] = widgets.Dropdown(
+            layout=layoutCol12, style=styleDescription,
+            description='采样器类型',
+            options=['pndm', 'lms', 'ddim', 'euler', 'euler-ancestral', 'dpm'],
+        )
+        widget_opt['checkpoint_path'] = widgets.Combobox(
             layout=layoutCol12, style=styleDescription,
             description='ckpt模型文件位置',
             description_tooltip='你要转换的模型位置',
-            value=" ",
-            disabled=False
+            options=collect_local_ckpts(),
         )
-        widget_opt['dump_path'] = widgets.Text(
+        widget_opt['model_root'] = widgets.Text(
             layout=layoutCol12, style=styleDescription,
             description='输出目录',
             description_tooltip='转换模型输出的地方',
-            value="outputs/convert",
-            disabled=False
         )
-
+        INVALID_PATH_TEXT = '（未输入模型或模型文件不存在）'
+        widget_opt['dump_path'] =  widgets.HTML(
+            layout=layoutCol12, style=styleDescription,
+            description='输出到：',
+            value = INVALID_PATH_TEXT,
+        )
+        
         for key in widget_opt:
             if (key in args) and (args[key] != widget_opt[key].value):
                 widget_opt[key].value = args[key]
-
-               
-        self.run_button = widgets.Button(
-            description='开始转换',
-            disabled=False,
-            button_style='success', # 'success', 'info', 'warning', 'danger' or ''
-            tooltip='点击运行（配置将自动更新）',
-            icon='check'
+        
+        # 事件处理绑定
+        def on_select_model(change):
+            filepath = change.new
+            if not os.path.isfile(filepath):
+                self.run_button.disabled = True
+                widget_opt['dump_path'].value = INVALID_PATH_TEXT
+            else:
+                self.run_button.disabled = False
+                widget_opt['dump_path'].value = os.path.join(
+                    widget_opt['model_root'].value,
+                    os.path.basename(filepath).rpartition('.')[0]
+                )
+        widget_opt['checkpoint_path'].observe(on_select_model, names='value')
+        
+        self.run_button = createView('run_button',
+            description = '开始转换',
+            tooltip = '点击开始转换模型',
+            disabled = True,
         )
         self.run_button.on_click(self.on_run_button_click)
         
-        self.gui = Box([
-                Box([
+        self.gui = createView("box_gui", 
+            children = [
+                createView("box_main", 
+                [
                     widget_opt['checkpoint_path'],
+                    widget_opt['scheduler_type'],
+                    widget_opt['extract_ema'],
+                    widget_opt['model_root'],
                     widget_opt['dump_path'],
-                    
-                ], layout = Layout(
-                    display = "flex",
-                    flex_flow = "row wrap", #HBox会覆写此属性
-                    align_items = "center",
-                    max_width = '100%',
-                )),
+                ]),
                 self.run_button, 
                 self.run_button_out
-            ], layout = Layout(display="block",margin="0 45px 0 0")
+            ]
         )
 
     def on_run_button_click(self, b):
         with self.run_button_out:
-            self.run_button.disabled = True
             clear_output()
+            assert os.path.isfile(self.widget_opt['dump_path'].value), '未输入模型或模型文件不存在'
             try:
                 print('开始处理...')
+                self.run_button.disabled = True
                 self.run(get_widget_extractor(self.widget_opt))
             finally:
                 self.run_button.disabled = False
