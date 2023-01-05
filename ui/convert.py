@@ -186,7 +186,8 @@ def load_torch(path: str, **pickle_load_args):
             for res in result:
                 extract_maybe_dict(res)
         elif isinstance(result, TensorMeta):
-            metadata.append(result)
+            if result not in metadata:
+                metadata.append(result)
 
     extract_maybe_dict(result_stage1)
     metadata = sorted(metadata, key=lambda x: x.key)
