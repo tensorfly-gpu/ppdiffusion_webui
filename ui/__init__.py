@@ -18,10 +18,10 @@ else:
     from .ui import (
         pipeline_superres,
         pipeline,
-        StableDiffusionUI_convert,
     )
     from .StableDiffusionUI_text_inversion import StableDiffusionUI_text_inversion
     from .StableDiffusionUI_dreambooth import StableDiffusionUI_dreambooth
+    from .StableDiffusionUI_convert import StableDiffusionUI_convert
     from .StableDiffusionUI_txt2img import StableDiffusionUI_txt2img
     from .StableDiffusionUI_img2img import StableDiffusionUI_img2img
     from .SuperResolutionUI import SuperResolutionUI
