@@ -88,10 +88,11 @@ Non-EMA weights are usually better to continue fine-tuning.""",
             description='输出目录',
             description_tooltip='转换模型输出的地方',
         )
-        INVALID_PATH_TEXT = '（未输入模型或模型文件不存在）'
-        widget_opt['dump_path'] =  widgets.HTML(
+        INVALID_PATH_TEXT = '（未输入ckpt模型或文件不存在）'
+        widget_opt['dump_path'] =  widgets.Text(
             layout=layoutCol12, style=styleDescription,
-            description='输出到：',
+            description='输出模型',
+            description_tooltip='转换后的模型。（整个文件夹即为模型）',
             value = INVALID_PATH_TEXT,
         )
         
@@ -138,7 +139,7 @@ Non-EMA weights are usually better to continue fine-tuning.""",
     def on_run_button_click(self, b):
         with self.run_button_out:
             clear_output()
-            assert os.path.isfile(self.widget_opt['dump_path'].value), '未输入模型或模型文件不存在'
+            assert os.path.isfile(self.widget_opt['checkpoint_path'].value), '未输入ckpt模型或文件不存在'
             try:
                 print('开始处理...')
                 self.run_button.disabled = True
