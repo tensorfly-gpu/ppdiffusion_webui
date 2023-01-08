@@ -50,6 +50,7 @@ class StableDiffusionUI_convert(StableDiffusionConvertUI):
             # "checkpoint_path": '',
             "model_root": 'models/',
             "scheduler_type": 'pndm',
+            "vae_checkpoint_path": '',
             "extract_ema": False,
         }
         args.update(kwargs)
@@ -86,6 +87,13 @@ Non-EMA weights are usually better to continue fine-tuning.""",
             description='ckpt模型文件位置',
             description_tooltip='你要转换的模型位置',
             options=collect_local_ckpts(),
+        )
+        widget_opt['vae_checkpoint_path'] = widgets.Text(
+            layout=layoutCol12, style=styleDescription,
+            description='vae文件位置',
+            description_tooltip='你要转换的vae模型位置',
+            value=" ",
+            disabled=False
         )
         widget_opt['model_root'] = widgets.Text(
             layout=layoutCol12, style=styleDescription,
@@ -130,6 +138,7 @@ Non-EMA weights are usually better to continue fine-tuning.""",
                 createView("box_main", 
                 [
                     widget_opt['checkpoint_path'],
+                    widget_opt['vae_checkpoint_path'],
                     widget_opt['scheduler_type'],
                     widget_opt['extract_ema'],
                     widget_opt['model_root'],

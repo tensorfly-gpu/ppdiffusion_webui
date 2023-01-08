@@ -1,5 +1,4 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import argparse
+
+from __future__ import annotations
+
+import io
 import os
+import pickle
+from functools import lru_cache
+
+import numpy as np
+from _io import BufferedReader
+
+MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
+import argparse
 import numpy as np
 import paddle
-import io
 import pickle
 from functools import lru_cache
 from paddlenlp.utils.downloader import get_path_from_url
-MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
 try:
     from omegaconf import OmegaConf
 except ImportError:
@@ -41,8 +49,6 @@ from ppdiffusers import (
     DPMSolverMultistepScheduler
 )
 
-#paddle.set_device("")
-
 class TensorMeta:
     """
     metadata of tensor
@@ -56,6 +62,12 @@ class TensorMeta:
 
     def __repr__(self):
         return f"size: {self.size} key: {self.key}, nbytes: {self.nbytes}, dtype: {self.dtype}"
+
+
+class SerializationError(Exception):
+    """Exception for serialization"""
+
+    pass
 
 
 @lru_cache(maxsize=None)
@@ -111,7 +123,7 @@ class UnpicklerWrapperStage(pickle.Unpickler):
             return _rebuild_tensor_stage
 
         # pytorch_lightning tensor builder
-        if mod_name == "pytorch_lightning":
+        if "pytorch_lightning" in mod_name:
             return dumpy
         return super().find_class(mod_name, name)
 
@@ -143,6 +155,52 @@ def dumpy(*args, **kwarsg):
     return None
 
 
+def seek_by_string(file_handler: BufferedReader, string: str, file_size: int) -> int:
+    """seek the index of file-handler with target words
+
+    Args:
+        file_handler (BufferedReader): file handler
+        string (str): the specific string in the file
+        file_size (int): size of file
+
+    Returns:
+        int: end index of target string
+    """
+    word_index = 0
+    word_bytes = string.encode("latin")
+    empty_byte = "".encode("latin")
+
+    while word_index < len(string) and file_handler.tell() < file_size:
+        content = file_handler.read(1)
+        if content == empty_byte:
+            break
+
+        if word_bytes[word_index] == content[0]:
+            word_index += 1
+        else:
+            word_index = 0
+
+    if file_handler.tell() >= file_size - 1:
+        raise SerializationError(f"can't find the find the target string<{string}> in the file")
+    return file_handler.tell()
+
+
+def read_prefix_key(file_handler: BufferedReader, file_size: int):
+    """read the prefix key in model weight file, eg: archive/pytorch_model
+
+    Args:
+        file_handler (BufferedReader): file handler
+        fiel_size (_type_): size of file
+
+    Returns:
+        _type_: _description_
+    """
+    end_index = seek_by_string(file_handler, "data.pkl", file_size)
+    file_handler.seek(MZ_ZIP_LOCAL_DIR_HEADER_SIZE)
+    prefix_key = file_handler.read(end_index - MZ_ZIP_LOCAL_DIR_HEADER_SIZE - len("/data.pkl"))
+    return prefix_key
+
+
 def load_torch(path: str, **pickle_load_args):
     """
     load torch weight file with the following steps:
@@ -162,7 +220,6 @@ def load_torch(path: str, **pickle_load_args):
     # 1. load the structure of pytorch weight file
     def persistent_load_stage1(saved_id):
         assert isinstance(saved_id, tuple)
-
         data = saved_id[1:]
         storage_type, key, _, numel = data
         dtype = storage_type.dtype
@@ -193,21 +250,16 @@ def load_torch(path: str, **pickle_load_args):
     metadata = sorted(metadata, key=lambda x: x.key)
     # 3. parse the tensor of pytorch weight file
     stage1_key_to_tensor = {}
+    content_size = os.stat(path).st_size
     with open(path, "rb") as file_handler:
         file_handler.seek(pre_offset)
+
         for tensor_meta in metadata:
             key = tensor_meta.key
-            # eg: archive/data/1FB
-            filename_with_fb = len(f"archive/data/{key}") + 2
-
-            # skip the fix position to read tensor data
-            # `MZ_ZIP_LOCAL_DIR_HEADER_SIZE` is from: https://github.com/pytorch/pytorch/blob/master/caffe2/serialize/inline_container.cc#L186
-            # `16` is the fixed characters size from binary file.
-            # `filename_with_fb` is the length of dynamic data key name
-            file_handler.seek(MZ_ZIP_LOCAL_DIR_HEADER_SIZE + 16 + filename_with_fb, 1)
+            seek_by_string(file_handler, "FB", content_size)
 
             padding_offset = np.frombuffer(file_handler.read(2)[:1], dtype=np.uint8)[0]
-            file_handler.read(padding_offset)
+            file_handler.seek(padding_offset, 1)
 
             # save the tensor info in result to re-use memory
             stage1_key_to_tensor[key] = np.frombuffer(
@@ -225,6 +277,7 @@ def load_torch(path: str, **pickle_load_args):
     result_stage2 = unpickler_stage2.load()
 
     return result_stage2
+
 
 def shave_segments(path, n_shave_prefix_segments=1):
     """
@@ -468,7 +521,8 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
     """
     Takes a state dict and a config, and returns a converted checkpoint.
     """
-
+    if "state_dict" in checkpoint:
+        checkpoint = checkpoint["state_dict"]
     # extract state_dict for UNet
     unet_state_dict = {}
     keys = list(checkpoint.keys())
@@ -495,7 +549,11 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
     for key in keys:
         if key.startswith(unet_key):
             unet_state_dict[key.replace(unet_key, "")] = checkpoint.pop(key)
-
+        else:
+            unet_state_dict[key] = checkpoint.get(key)
+            
+    if len(unet_state_dict) == 0:
+        return None
     new_checkpoint = {}
 
     new_checkpoint["time_embedding.linear_1.weight"] = unet_state_dict["time_embed.0.weight"]
@@ -637,6 +695,8 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
 
 
 def convert_ldm_vae_checkpoint(checkpoint, config):
+    if "state_dict" in checkpoint:
+        checkpoint = checkpoint["state_dict"]
     # extract state dict for VAE
     vae_state_dict = {}
     vae_key = "first_stage_model."
@@ -644,7 +704,11 @@ def convert_ldm_vae_checkpoint(checkpoint, config):
     for key in keys:
         if key.startswith(vae_key):
             vae_state_dict[key.replace(vae_key, "")] = checkpoint.get(key)
-
+        else:
+            vae_state_dict[key] = checkpoint.get(key)
+    
+    if len(vae_state_dict) == 0:
+        return None
     new_checkpoint = {}
 
     new_checkpoint["encoder.conv_in.weight"] = vae_state_dict["encoder.conv_in.weight"]
@@ -764,8 +828,9 @@ def check_keys(model, state_dict):
     for k, v in model.state_dict().items():
         if k not in state_dict.keys():
             missing_keys.append(k)
-        if list(v.shape) != list(state_dict[k].shape):
-            mismatched_keys.append(k)
+        else:            
+            if list(v.shape) != list(state_dict[k].shape):
+                mismatched_keys.append(k)
     if len(missing_keys):
         missing_keys_str = ", ".join(missing_keys)
         print(f"{cls_name} Found missing_keys {missing_keys_str}!")
@@ -775,11 +840,17 @@ def check_keys(model, state_dict):
 
 
 def convert_hf_clip_to_ppnlp_clip(checkpoint, dtype="float32"):
+    if "state_dict" in checkpoint:
+        checkpoint = checkpoint["state_dict"]
     clip = {}
     for key in checkpoint.keys():
         if key.startswith("cond_stage_model.transformer"):
             clip[key[len("cond_stage_model.transformer.") :]] = checkpoint[key]
-            
+        else:
+            clip[key] = checkpoint[key]
+    if len(clip) == 0:
+        return None, None
+    
     new_model_state = {}
     transformers2ppnlp = {
         ".encoder.": ".transformer.",
@@ -828,12 +899,14 @@ def convert_hf_clip_to_ppnlp_clip(checkpoint, dtype="float32"):
     }
     return new_model_state, new_config
 
-#if __name__ == "__main__":
 def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
         "--checkpoint_path", default=None, type=str, help="Path to the checkpoint to convert."
+    )
+    parser.add_argument(
+        "--vae_checkpoint_path", default=None, type=str, help="Path to the vae checkpoint to convert."
     )
     # !wget https://raw.githubusercontent.com/CompVis/stable-diffusion/main/configs/stable-diffusion/v1-inference.yaml
     parser.add_argument(
@@ -864,8 +937,6 @@ def parse_args():
         ),
     )
     parser.add_argument("--dump_path", default=None, type=str, help="Path to the output model.")
-    #args = parser.parse_args()
-    #args = parser.parse_args(args=[])
     args = parser.parse_known_args()[0]
     return args
 
@@ -874,12 +945,19 @@ def main(args): #主函数
         print("ckpt模型文件位置不能为空！")
         return 
     if not os.path.exists(args.checkpoint_path):
-        print(f"{args.checkpoint_path}文件不存在，请检查是否存在！")
+        print(f"{args.checkpoint_path} ckpt 文件不存在，请检查是否存在！")
         return 
+
+    if args.vae_checkpoint_path.strip() == "":
+        args.vae_checkpoint_path = None
+    if args.vae_checkpoint_path is not None:
+        if not os.path.exists(args.vae_checkpoint_path):
+            print(f"{args.vae_checkpoint_path} vae 文件不存在，我们将尝试使用ckpt文件的vae权重！")
+            args.vae_checkpoint_path = None
+    print("正在开始转换，请耐心等待！！！")
     image_size = 512
     checkpoint = load_torch(args.checkpoint_path)
     checkpoint = checkpoint.get("state_dict", checkpoint)
-    print("开始转换，请耐心等待！")
     if args.original_config_file is None:
         get_path_from_url("https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/v1-inference.yaml", root_dir="./")
 
@@ -931,45 +1009,73 @@ def main(args): #主函数
     diffusers_unet_checkpoint = convert_ldm_unet_checkpoint(
         checkpoint, diffusers_unet_config, path=args.checkpoint_path, extract_ema=args.extract_ema
     )
-    unet = UNet2DConditionModel.from_config(diffusers_unet_config)
-    ppdiffusers_unet_checkpoint = convert_diffusers_vae_unet_to_ppdiffusers(unet, diffusers_unet_checkpoint)
-    check_keys(unet, ppdiffusers_unet_checkpoint)
-    unet.load_dict(ppdiffusers_unet_checkpoint)
-    print("Unet转换成功！")
+    if diffusers_unet_checkpoint is not None:
+        unet = UNet2DConditionModel.from_config(diffusers_unet_config)
+        ppdiffusers_unet_checkpoint = convert_diffusers_vae_unet_to_ppdiffusers(unet, diffusers_unet_checkpoint)
+        check_keys(unet, ppdiffusers_unet_checkpoint)
+        unet.load_dict(ppdiffusers_unet_checkpoint)
+        print(">>> Unet转换成功！")
+    else:
+        unet = None
+        print("在CKPT中，未发现Unet权重，请确认是否存在！")
 
     print("2. 开始转换Vae！")
     # 2. Convert the VAE model.
     vae_config = create_vae_diffusers_config(original_config, image_size=image_size)
-    diffusers_vae_checkpoint = convert_ldm_vae_checkpoint(checkpoint, vae_config)
-    vae = AutoencoderKL.from_config(vae_config)
-    ppdiffusers_vae_checkpoint = convert_diffusers_vae_unet_to_ppdiffusers(vae, diffusers_vae_checkpoint)
-    check_keys(vae, ppdiffusers_vae_checkpoint)
-    vae.load_dict(ppdiffusers_vae_checkpoint)
-    print("VAE转换成功！")
-
+    if args.vae_checkpoint_path is not None:
+        vae_checkpoint = load_torch(args.vae_checkpoint_path)
+        print(f"发现 {args.vae_checkpoint_path}，我们将转换该文件的vae权重！")
+    else:
+        vae_checkpoint = checkpoint
+    diffusers_vae_checkpoint = convert_ldm_vae_checkpoint(vae_checkpoint, vae_config)
+    if diffusers_vae_checkpoint is not None:
+        vae = AutoencoderKL.from_config(vae_config)
+        ppdiffusers_vae_checkpoint = convert_diffusers_vae_unet_to_ppdiffusers(vae, diffusers_vae_checkpoint)
+        check_keys(vae, ppdiffusers_vae_checkpoint)
+        vae.load_dict(ppdiffusers_vae_checkpoint)
+        print(">>> VAE转换成功！")
+    else:
+        vae = None
+        print("在CKPT中，未发现Vae权重，请确认是否存在！")
+        
     print("3. 开始转换text_encoder！")
     # 3. Convert the text_encoder model.
     text_model_state_dict, text_config = convert_hf_clip_to_ppnlp_clip(checkpoint, dtype="float32")
-    text_model = CLIPTextModel(**text_config)
-    text_model.eval()
-    check_keys(text_model, text_model_state_dict)
-    text_model.load_dict(text_model_state_dict)
-    print("text_encoder转换成功！")
+    if text_model_state_dict is not None:
+        text_model = CLIPTextModel(**text_config)
+        text_model.eval()
+        check_keys(text_model, text_model_state_dict)
+        text_model.load_dict(text_model_state_dict)
+        print(">>> text_encoder转换成功！")
+    else:
+        text_model = None
+        print("在CKPT中，未发现TextModel权重，请确认是否存在！")
 
     print("4. 开始转换CLIPTokenizer！")
     # 4. Convert the tokenizer.
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14", pad_token="!", model_max_length=77)
-    print("CLIPTokenizer 转换成功！")
-
-    pipe = StableDiffusionPipeline(
-        vae=vae,
-        text_encoder=text_model,
-        tokenizer=tokenizer,
-        unet=unet,
-        scheduler=scheduler,
-        safety_checker=None,
-        feature_extractor=None,
-        requires_safety_checker=False,
-    )
-    pipe.save_pretrained(args.dump_path)
-    print("转换完成啦，请前往"+str(args.dump_path)+"查看转换好的模型")
+    print(">>> CLIPTokenizer 转换成功！")
+    
+    if text_model is not None and vae is not None and unet is not None:
+        pipe = StableDiffusionPipeline(
+            vae=vae,
+            text_encoder=text_model,
+            tokenizer=tokenizer,
+            unet=unet,
+            scheduler=scheduler,
+            safety_checker=None,
+            feature_extractor=None,
+            requires_safety_checker=False,
+        )
+        pipe.save_pretrained(args.dump_path)
+        print(">>> 所有权重转换完成啦，请前往"+str(args.dump_path)+"查看转换好的模型！")
+    else:
+        if vae is not None:
+            vae.save_pretrained(os.path.join(args.dump_path, "vae"))
+        if text_model is not None:
+            text_model.save_pretrained(os.path.join(args.dump_path, "text_encoder"))
+        if unet is not None:
+            unet.save_pretrained(os.path.join(args.dump_path, "unet"))
+        scheduler.save_pretrained(os.path.join(args.dump_path, "scheduler"))
+        tokenizer.save_pretrained(os.path.join(args.dump_path, "tokenizer"))
+        print(">>> 部分权重转换完成啦，请前往"+str(args.dump_path)+"查看转换好的部分模型！")
