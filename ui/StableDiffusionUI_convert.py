@@ -91,8 +91,8 @@ Non-EMA weights are usually better to continue fine-tuning.""",
         widget_opt['vae_checkpoint_path'] = widgets.Text(
             layout=layoutCol12, style=styleDescription,
             description='vae文件位置',
-            description_tooltip='你要转换的vae模型位置',
-            value=" ",
+            description_tooltip='指定一个vae用于替代ckpt中的vae，提别是ckpt中不包含vae的时候',
+            value='',
             disabled=False
         )
         widget_opt['model_root'] = widgets.Text(
