@@ -6,7 +6,7 @@ from .ui import pipeline, get_widget_extractor
 from .utils import compute_gpu_memory, empty_cache
 from .textual_inversion import parse_args as textual_inversion_parse_args
 from .textual_inversion import main as textual_inversion_main
-from .views import createView, setLayout, SHARED_STYLE_SHEETS
+from .views import createView, createModelNameView, setLayout, SHARED_STYLE_SHEETS
 
 ####################################################################
 #
@@ -164,9 +164,9 @@ class StableDiffusionUI_text_inversion(StableDiffusionTrainUI):
             value=200,
             step=100,
         )
-        widget_opt['model_name'] = createView(
-            'model_name',
-            layout_name='col12',
+        
+        widget_opt['model_name'] = createModelNameView(
+            self.pipeline,
             description='训练所使用模型的名称（清空输入框以显示更多模型）',
         )
         

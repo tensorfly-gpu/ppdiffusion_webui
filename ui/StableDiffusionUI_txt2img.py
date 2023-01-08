@@ -63,6 +63,11 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
         widget_opt['width'] = view_width_height['width']
         widget_opt['height'] = view_width_height['height']
         
+        widget_opt['model_name'] = views.createModelNameView(
+            self.pipeline,
+            args['model_name'] if 'model_name' in args else None
+            )
+        
         for key in (
              'standard_size',
              'num_return_images',
@@ -75,7 +80,6 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
              'superres_model_name',
              'output_dir',
              'sampler',
-             'model_name',
              'concepts_library_dir'
             ):
             widget_opt[key] = views.createView(key)

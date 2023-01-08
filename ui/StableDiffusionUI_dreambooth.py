@@ -6,7 +6,7 @@ from .ui import pipeline, get_widget_extractor
 from .utils import empty_cache
 from .dreambooth import parse_args as dreambooth_parse_args
 from .dreambooth import main as dreambooth_main
-from .views import createView, setLayout, SHARED_STYLE_SHEETS
+from .views import createView, createModelNameView, setLayout, SHARED_STYLE_SHEETS
 
 ####################################################################
 #
@@ -84,8 +84,8 @@ class StableDiffusionUI_dreambooth(StableDiffusionDreamboothUI):
         args.update(kwargs)
 
         widget_opt = self.widget_opt
-        widget_opt['pretrained_model_name_or_path'] = createView(
-            'model_name',
+        widget_opt['pretrained_model_name_or_path'] = createModelNameView(
+            self.pipeline,
             description='训练所使用模型的名称（清空输入框以显示更多模型）',
         )
         widget_opt['instance_data_dir'] = widgets.Text(

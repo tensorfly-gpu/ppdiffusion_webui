@@ -8,6 +8,7 @@ from .utils import empty_cache, collect_local_ckpts
 from .convert import parse_args as convert_parse_args
 from .convert import main as convert_parse_main
 from .views import createView
+from .model_collection import model_collection
 
 #####################################
 #M0DE1 C0NVERT
@@ -33,6 +34,9 @@ class StableDiffusionConvertUI():
             raise ValueError("你必须给出一个可用的ckpt模型路径")
         convert_parse_main(args)
         empty_cache()
+        
+        model_collection.record_model_name(args.dump_path)
+        model_collection.refresh_locals()
         
     # def on_run_button_click(self, b):
         # with self.run_button_out:

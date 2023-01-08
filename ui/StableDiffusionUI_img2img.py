@@ -158,6 +158,10 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
         widget_opt['strength'].add_class('strength')
         views.setLayout('col08', widget_opt['strength'])
         
+        widget_opt['model_name'] = views.createModelNameView(
+            self.pipeline,
+            args['model_name'] if 'model_name' in args else None
+            )
         
         for key in (
              'num_return_images',
@@ -166,7 +170,6 @@ class StableDiffusionUI_img2img(StableDiffusionUI):
              'seed',
              'output_dir',
              'sampler',
-             'model_name',
              'concepts_library_dir',
             ):
             widget_opt[key] = views.createView(key)

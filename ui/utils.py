@@ -5,7 +5,9 @@ from contextlib import nullcontext, contextmanager
 from IPython.display import clear_output, display
 from pathlib import Path
 from PIL import Image
+from traitlets import HasTraits, Unicode
 from .png_info_helper import serialize_to_text, serialize_to_pnginfo
+from .model_collection import model_collection
 import paddle
 
 _VAE_SIZE_THRESHOLD_ = 300000000       # vae should not be smaller than this
@@ -88,15 +90,6 @@ def package_install(verbose = True):
 def diffusers_auto_update(verbose = True):
     package_install(verbose=verbose)
 
-def try_get_catched_model(model_name):
-    path = os.path.join('./models/', model_name)
-    if check_is_model_complete(path):
-        return path
-    path = os.path.join('./', model_name)
-    if check_is_model_complete(path):
-        return path
-    return model_name
-    
 @contextmanager
 def context_nologging():
     import logging
@@ -200,49 +193,6 @@ def get_multiple_tokens(token, num = 1, ret_list = True):
     return ' '.join(tokens)
 
 
-def collect_local_module_names(base_paths = None):
-    """从指定位置检索可用的模型名称，以用于UI选择模型"""
-    base_paths = (
-            './', 
-            './models', 
-            os.path.join(os.environ['PPNLP_HOME'], 'models')
-        ) if base_paths is None \
-        else (base_paths,) if isinstance(base_paths, str) \
-        else base_paths
-    
-    is_model = lambda base, name: (os.path.isfile(
-            os.path.join(base, name,'model_index.json')
-        )) and (os.path.isfile(
-            os.path.join(base, name,'vae', 'config.json')
-        )) and (os.path.isfile(
-            os.path.join(base, name,'unet', 'model_state.pdparams')
-        ))
-        
-    models = []
-    for base_path in base_paths:
-        if not os.path.isdir(base_path): continue
-        for name in os.listdir(base_path):
-            if name.startswith('.'): continue
-            
-            path = os.path.join(base_path, name)
-            
-            if path in base_paths: continue
-            if not os.path.isdir(path): continue
-            
-            if is_model(base_path, name):
-                models.append(name)
-                continue
-            
-            for name2 in os.listdir(path):
-                if name.startswith('.'): continue
-                path2 = os.path.join(path, name2)
-                if os.path.isdir(path2) and is_model(path, name2):
-                    models.append(f'{name}/{name2}')
-                    continue
-    
-    sorted(models)
-    return models
-
 def collect_local_ckpts(base_paths = None):
     if base_paths is None:
         base_paths = [
@@ -271,11 +221,15 @@ def collect_local_ckpts(base_paths = None):
             for name2 in os.listdir(path):
                 if os.path.isfile(path) and name.endswith('.ckpt'):
                     models.append(path)
+    
+    sorted(models)
     return models
     
+class StableDiffusionFriendlyPipeline(HasTraits):
+    model = Unicode()
     
-class StableDiffusionFriendlyPipeline():
     def __init__(self, model_name = "runwayml/stable-diffusion-v1-5", superres_pipeline = None):
+        super().__init__()
         self.pipe = None
 
         # model
@@ -290,7 +244,7 @@ class StableDiffusionFriendlyPipeline():
         self.superres_pipeline = superres_pipeline
 
         self.added_tokens = []
-                
+        
     def from_pretrained(self, verbose = True, force = False, model_name=None):
         if model_name is not None:
             if len(model_name.strip()) == 0:
@@ -413,12 +367,14 @@ class StableDiffusionFriendlyPipeline():
             self.pipe.text_encoder = self.pipe.text_encoder.to(dtype = original_dtype)
     
     def run(self, opt, task = 'txt2img', on_image_generated = None):
-        model_name = try_get_catched_model(opt.model_name)
+        model_name = opt.model_name
         self.from_pretrained(model_name=model_name)
         self.load_concepts(opt)
-
+        
+        # 记录模型
+        model_collection.record_model_name(opt.model_name)
         seed = None if opt.seed == -1 else opt.seed
-
+        
         # switch scheduler
         self.pipe.scheduler = self.available_schedulers[opt.sampler]
         task_func = None

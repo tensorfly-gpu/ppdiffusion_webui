@@ -1,5 +1,3 @@
-
-from traitlets import Bunch
 import ipywidgets
 from ipywidgets import (
     IntText,
@@ -11,31 +9,10 @@ from ipywidgets import (
     # Box应当始终假定display不明
     # HBox/VBox应当仅用于【单行/单列】内容
 )
-from .utils import collect_local_module_names
+from traitlets import Bunch, directional_link
+from .model_collection import model_collection
+from .model_collection import default_model_list as model_name_list
 
-model_name_list = [
-    "MoososCap/NOVEL-MODEL", 
-    "ruisi/anything",
-    "Linaqruf/anything-v3.0",
-    "Baitian/momocha",
-    "Baitian/momoco",
-    "hequanshaguo/monoko-e",
-    "hakurei/waifu-diffusion", 
-    "hakurei/waifu-diffusion-v1-3", 
-    "CompVis/stable-diffusion-v1-4", 
-    "runwayml/stable-diffusion-v1-5", 
-    "stabilityai/stable-diffusion-2",
-    "stabilityai/stable-diffusion-2-base",
-    "naclbit/trinart_stable_diffusion_v2_60k", 
-    "naclbit/trinart_stable_diffusion_v2_95k", 
-    "naclbit/trinart_stable_diffusion_v2_115k", 
-    "ringhyacinth/nail-set-diffuser",
-    "Deltaadams/Hentai-Diffusion",
-    "BAAI/AltDiffusion",
-    "BAAI/AltDiffusion-m9",
-    "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1",
-    "IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1",
-    "huawei-noah/Wukong-Huahua"]
 
 sampler_list = [
     "default",
@@ -443,11 +420,6 @@ def createView(name, value = None, **kwargs):
     #实例化
     widget = ctor(**args)
     
-    # 给模型列表补充本地模型
-    if name == 'model_name':
-        widget.options = list(widget.options) + \
-            [m for m in collect_local_module_names() if m not in widget.options]
-    
     # 添加DOM class名
     if 'class_name' in options:
         widget.add_class(options['class_name'])
@@ -670,7 +642,18 @@ def createWidthHeightView(width_value = 512, height_value = 512, step64 = False)
         return _create_WHView(width_value, height_value)
     else:
         return _create_WHView_for_img2img(width_value, height_value)
-        
+    
+def createModelNameView(pipeline = None, value = None, **kwargs):
+    widget = createView('model_name', value, **kwargs)
+    if pipeline is not None:
+        _val = widget.value
+        directional_link( (pipeline, 'model'), (widget, 'value'))
+        widget.value = _val
+    model_collection.load_locals()
+    directional_link( (model_collection, 'models'), (widget, 'options'))
+    return widget
+    
+    
 
 # --------------------------------------------------
     
