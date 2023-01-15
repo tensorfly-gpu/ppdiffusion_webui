@@ -80,6 +80,7 @@ def package_install(verbose = True):
         from ppdiffusers.utils import image_grid
         from paddlenlp.transformers.clip.feature_extraction import CLIPFeatureExtractor
         from paddlenlp.transformers import FeatureExtractionMixin
+        from omegaconf import OmegaConf
         
     except (ModuleNotFoundError, ImportError, AttributeError):
         if verbose: print('检测到库不完整, 正在安装库')
