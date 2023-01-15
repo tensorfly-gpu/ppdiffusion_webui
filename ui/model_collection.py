@@ -108,7 +108,7 @@ class ObservableModelCollection(HasTraits):
                 _last_models.append(name)
         local_model_list.clear()
         local_model_list.extend(_last_models)
-        local_model_list.extend(_local_models)
+        local_model_list.extend(name for name in _local_models if name not in default_model_list)
         self._has_loaded = True
         self._update_list()
     
