@@ -1,4 +1,5 @@
 import ipywidgets
+from contextlib import contextmanager
 from ipywidgets import (
     IntText,
     BoundedIntText,
@@ -105,6 +106,14 @@ _Views = {
         "description": '负面描述',
         "description_tooltip": '使生成图像的内容远离负面描述的文本',
     },
+    "replacement": {
+        "__type": 'Textarea',
+        "class_name": 'replacement',
+        "layout_name": 'col12',
+        "style": _description_style,
+        "description": '描述词' ,
+        "description_tooltip": '仅支持(xxx)、(xxx:1.2)、[xxx]三种语法。设置括号格式可以对{}进行转换。',
+    },
     
     # Text
     "concepts_library_dir": {
@@ -143,7 +152,7 @@ _Views = {
         "description_tooltip": '推理步数（Step）：生成图片的迭代次数，步数越多运算次数越多。',
         "value": 50,
         "min": 2,
-        "max": 10000,
+        "max": 500,
     },
     "num_return_images": {
         "__type": 'BoundedIntText',
@@ -261,7 +270,25 @@ _Views = {
         "button_style": 'success', # 'success', 'info', 'warning', 'danger' or ''
         "description": '生成图片！',
         "tooltip": '单击开始生成图片',
-        "icon": 'check'
+        "icon": 'check',
+    },
+    "run_plot": {
+        "__type": 'Button',
+        "class_name": 'run_plot',
+        "layout_name": 'btnV5',
+        "button_style": 'success',
+        "description": '生成XY图',
+        "tooltip": '单击开始生成XY表格图',
+        "icon": 'check',
+    },
+    "check_button": {
+        "__type": 'Button',
+        "class_name": 'check_button',
+        "layout_name": 'btnV5',
+        "button_style": 'warning',
+        "description": '检查参数',
+        "tooltip": '检查行列参数是否设置异常（注意警告信息）',
+        "icon": 'tasks',
     },
     "collect_button": {
         "__type": 'Button',
@@ -397,6 +424,11 @@ def _mergeViewOptions(defaultOpt,kwargs):
     
     return (r, r2)
 
+def getOptionDescription(name):
+    return _Views[name]["description"] \
+        if (name in _Views) \
+        and ("description" in _Views[name]) \
+        else ''
     
 def createView(name, value = None, **kwargs):
     assert name in _Views, f'未定义的View名称 {name}'
@@ -654,8 +686,25 @@ def createModelNameView(pipeline = None, value = None, **kwargs):
     return widget
     
     
+@contextmanager
+def freeze(w):
+    try:
+        w.disabled = True
+        yield
+        # 注意错误会被隐藏
+    finally:
+        w.disabled = False
 
 # --------------------------------------------------
+    
+def Accordion(children = None, **kwargs):
+    titles = None if 'titles' not in kwargs else kwargs.pop('titles')
+    if children is not None: kwargs['children'] = children
+    tab = ipywidgets.Accordion(**kwargs)
+    if titles is not None:
+        for i in range(len(titles)):
+            tab.set_title(i, titles[i])
+    return tab
     
 def Tab(children = None, **kwargs):
     titles = None if 'titles' not in kwargs else kwargs.pop('titles')
