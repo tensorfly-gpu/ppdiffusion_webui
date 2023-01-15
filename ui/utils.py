@@ -84,7 +84,9 @@ def package_install(verbose = True):
     except (ModuleNotFoundError, ImportError, AttributeError):
         if verbose: print('检测到库不完整, 正在安装库')
         os.system("pip install -U pip  -i https://mirror.baidu.com/pypi/simple")
-        os.system("pip install -U ppdiffusers paddlenlp OmegaConf --user")
+        os.system("pip install -U OmegaConf --user")
+        os.system("pip install ppdiffusers==0.9.0 --user")
+        os.system("pip install paddlenlp==2.4.9 --user")
         clear_output()
 
 def diffusers_auto_update(verbose = True):

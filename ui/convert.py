@@ -49,6 +49,17 @@ from ppdiffusers import (
     DPMSolverMultistepScheduler
 )
 
+import io
+import os
+import pickle
+from functools import lru_cache
+
+import numpy as np
+from _io import BufferedReader
+
+MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
+
+
 class TensorMeta:
     """
     metadata of tensor
@@ -233,7 +244,7 @@ def load_torch(path: str, **pickle_load_args):
     result_stage1 = unpickler_stage1.load()
 
     # 2. get the metadata of weight file
-    metadata = []
+    metadata = {}
 
     def extract_maybe_dict(result):
         if isinstance(result, dict):
@@ -243,19 +254,19 @@ def load_torch(path: str, **pickle_load_args):
             for res in result:
                 extract_maybe_dict(res)
         elif isinstance(result, TensorMeta):
-            if result not in metadata:
-                metadata.append(result)
+            metadata[result.key] = result
 
     extract_maybe_dict(result_stage1)
+    metadata = list(metadata.values())
     metadata = sorted(metadata, key=lambda x: x.key)
     # 3. parse the tensor of pytorch weight file
     stage1_key_to_tensor = {}
     content_size = os.stat(path).st_size
     with open(path, "rb") as file_handler:
         file_handler.seek(pre_offset)
-
         for tensor_meta in metadata:
-            key = tensor_meta.key
+            key = tensor_meta.key            
+            seek_by_string(file_handler, f"data/{key}", content_size)
             seek_by_string(file_handler, "FB", content_size)
 
             padding_offset = np.frombuffer(file_handler.read(2)[:1], dtype=np.uint8)[0]
@@ -522,19 +533,19 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
     Takes a state dict and a config, and returns a converted checkpoint.
     """
     if "state_dict" in checkpoint:
-        checkpoint = checkpoint["state_dict"]
+        checkpoint = checkpoint["state_dict"] if len(checkpoint["state_dict"]) > 25 else checkpoint
     # extract state_dict for UNet
     unet_state_dict = {}
     keys = list(checkpoint.keys())
 
     unet_key = "model.diffusion_model."
+
     # at least a 100 parameters have to start with `model_ema` in order for the checkpoint to be EMA
     if sum(k.startswith("model_ema") for k in keys) > 100:
         print(f"Checkpoint {path} has both EMA and non-EMA weights.")
         if extract_ema:
             print(
-                "In this conversion only the EMA weights are extracted. If you want to instead extract the non-EMA"
-                " weights (useful to continue fine-tuning), please make sure to remove the `--extract_ema` flag."
+                "我们将提取EMA版的UNET权重。如果你想使用非EMA版权重进行微调的话，请确保将『是否提取ema权重』选项设置为 『否』！"
             )
             for key in keys:
                 if key.startswith("model.diffusion_model"):
@@ -542,15 +553,18 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
                     unet_state_dict[key.replace(unet_key, "")] = checkpoint.pop(flat_ema_key)
         else:
             print(
-                "In this conversion only the non-EMA weights are extracted. If you want to instead extract the EMA"
-                " weights (usually better for inference), please make sure to add the `--extract_ema` flag."
+                "我们将提取非EMA版的UNET权重。如果你想使用EMA版权重的话，请确保将『是否提取ema权重』选项设置为 『是』"
             )
 
-    for key in keys:
-        if key.startswith(unet_key):
-            unet_state_dict[key.replace(unet_key, "")] = checkpoint.pop(key)
-        else:
-            unet_state_dict[key] = checkpoint.get(key)
+    if extract_ema and len(unet_state_dict) == 0:
+        print("由于我们在CKPT中未找到EMA权重，因此我们将不会『提取ema权重』！")
+
+    # 如果没有找到ema的权重，
+    if len(unet_state_dict) == 0:
+        for key in keys:
+            if "model_ema" in key: continue
+            if key.startswith(unet_key):
+                unet_state_dict[key.replace(unet_key, "")] = checkpoint.pop(key)
             
     if len(unet_state_dict) == 0:
         return None
@@ -582,14 +596,13 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
         layer_id: [key for key in unet_state_dict if f"middle_block.{layer_id}" in key]
         for layer_id in range(num_middle_blocks)
     }
-
     # Retrieves the keys for the output blocks only
     num_output_blocks = len({".".join(layer.split(".")[:2]) for layer in unet_state_dict if "output_blocks" in layer})
     output_blocks = {
         layer_id: [key for key in unet_state_dict if f"output_blocks.{layer_id}" in key]
         for layer_id in range(num_output_blocks)
     }
-
+    
     for i in range(1, num_input_blocks):
         block_id = (i - 1) // (config["layers_per_block"] + 1)
         layer_in_block_id = (i - 1) % (config["layers_per_block"] + 1)
@@ -649,6 +662,7 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
             else:
                 output_block_list[layer_id] = [layer_name]
 
+
         if len(output_block_list) > 1:
             resnets = [key for key in output_blocks[i] if f"output_blocks.{i}.0" in key]
             attentions = [key for key in output_blocks[i] if f"output_blocks.{i}.1" in key]
@@ -663,6 +677,18 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
 
             if ["conv.weight", "conv.bias"] in output_block_list.values():
                 index = list(output_block_list.values()).index(["conv.weight", "conv.bias"])
+                new_checkpoint[f"up_blocks.{block_id}.upsamplers.0.conv.weight"] = unet_state_dict[
+                    f"output_blocks.{i}.{index}.conv.weight"
+                ]
+                new_checkpoint[f"up_blocks.{block_id}.upsamplers.0.conv.bias"] = unet_state_dict[
+                    f"output_blocks.{i}.{index}.conv.bias"
+                ]
+
+                # Clear attentions as they have been attributed above.
+                if len(attentions) == 2:
+                    attentions = []
+            elif ["conv.bias", "conv.weight"] in output_block_list.values():
+                index = list(output_block_list.values()).index(["conv.bias", "conv.weight"])
                 new_checkpoint[f"up_blocks.{block_id}.upsamplers.0.conv.weight"] = unet_state_dict[
                     f"output_blocks.{i}.{index}.conv.weight"
                 ]
@@ -690,13 +716,12 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
                 new_path = ".".join(["up_blocks", str(block_id), "resnets", str(layer_in_block_id), path["new"]])
 
                 new_checkpoint[new_path] = unet_state_dict[old_path]
-
     return new_checkpoint
 
 
-def convert_ldm_vae_checkpoint(checkpoint, config):
+def convert_ldm_vae_checkpoint(checkpoint, config, only_vae=False):
     if "state_dict" in checkpoint:
-        checkpoint = checkpoint["state_dict"]
+        checkpoint = checkpoint["state_dict"] if len(checkpoint["state_dict"]) > 25 else checkpoint
     # extract state dict for VAE
     vae_state_dict = {}
     vae_key = "first_stage_model."
@@ -704,8 +729,9 @@ def convert_ldm_vae_checkpoint(checkpoint, config):
     for key in keys:
         if key.startswith(vae_key):
             vae_state_dict[key.replace(vae_key, "")] = checkpoint.get(key)
-        else:
-            vae_state_dict[key] = checkpoint.get(key)
+
+    if only_vae:
+        vae_state_dict = checkpoint
     
     if len(vae_state_dict) == 0:
         return None
@@ -841,13 +867,15 @@ def check_keys(model, state_dict):
 
 def convert_hf_clip_to_ppnlp_clip(checkpoint, dtype="float32"):
     if "state_dict" in checkpoint:
-        checkpoint = checkpoint["state_dict"]
+        checkpoint = checkpoint["state_dict"] if len(checkpoint["state_dict"]) > 25 else checkpoint
     clip = {}
     for key in checkpoint.keys():
         if key.startswith("cond_stage_model.transformer"):
-            clip[key[len("cond_stage_model.transformer.") :]] = checkpoint[key]
-        else:
-            clip[key] = checkpoint[key]
+            newkey = key[len("cond_stage_model.transformer.") :]
+            if not newkey.startswith("text_model."):
+                newkey = "text_model." + newkey
+            clip[newkey] = checkpoint[key]
+
     if len(clip) == 0:
         return None, None
     
@@ -948,8 +976,9 @@ def main(args): #主函数
         print(f"{args.checkpoint_path} ckpt 文件不存在，请检查是否存在！")
         return 
 
-    if args.vae_checkpoint_path.strip() == "":
+    if args.vae_checkpoint_path is not None and args.vae_checkpoint_path.strip() == "":
         args.vae_checkpoint_path = None
+
     if args.vae_checkpoint_path is not None:
         if not os.path.exists(args.vae_checkpoint_path):
             print(f"{args.vae_checkpoint_path} vae 文件不存在，我们将尝试使用ckpt文件的vae权重！")
@@ -1025,9 +1054,11 @@ def main(args): #主函数
     if args.vae_checkpoint_path is not None:
         vae_checkpoint = load_torch(args.vae_checkpoint_path)
         print(f"发现 {args.vae_checkpoint_path}，我们将转换该文件的vae权重！")
+        only_vae = True
     else:
         vae_checkpoint = checkpoint
-    diffusers_vae_checkpoint = convert_ldm_vae_checkpoint(vae_checkpoint, vae_config)
+        only_vae = False
+    diffusers_vae_checkpoint = convert_ldm_vae_checkpoint(vae_checkpoint, vae_config,  only_vae=only_vae)
     if diffusers_vae_checkpoint is not None:
         vae = AutoencoderKL.from_config(vae_config)
         ppdiffusers_vae_checkpoint = convert_diffusers_vae_unet_to_ppdiffusers(vae, diffusers_vae_checkpoint)
@@ -1079,3 +1110,4 @@ def main(args): #主函数
         scheduler.save_pretrained(os.path.join(args.dump_path, "scheduler"))
         tokenizer.save_pretrained(os.path.join(args.dump_path, "tokenizer"))
         print(">>> 部分权重转换完成啦，请前往"+str(args.dump_path)+"查看转换好的部分模型！")
+        
