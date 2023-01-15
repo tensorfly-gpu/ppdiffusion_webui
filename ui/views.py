@@ -296,7 +296,7 @@ _Views = {
         "layout_name": 'btnV5',
         "button_style": 'info', # 'success', 'info', 'warning', 'danger' or ''
         "description": '收藏图片',
-        "tooltip": '将图片转移到Favorates文件夹中',
+        "tooltip": '将图片转移到Favorites文件夹中',
         "icon": 'star-o',
         "disabled": True,
     },

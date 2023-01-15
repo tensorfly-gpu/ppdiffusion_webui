@@ -797,8 +797,7 @@ class ImageCollectionView(Box):
         super().__init__()
         self.data_list = []
         
-        # TODO: Favorites改名
-        self.collect_dir = time.strftime('Favorates/images-%m%d/') 
+        self.collect_dir = time.strftime('Favorites/images-%m%d/') 
         self.delete_dir = time.strftime('TrashBin/images-%m%d/') 
         
         # 翻页部分
@@ -845,7 +844,7 @@ class ImageCollectionView(Box):
         btn_collect = widgets.Button(
             icon = 'star-o',
             button_style = 'info',
-            tooltip = '将图片转移到Favorates文件夹中',
+            tooltip = '将图片转移到Favorites文件夹中',
             layout = Layout(
                 width= 'auto',
                 height = 'auto',

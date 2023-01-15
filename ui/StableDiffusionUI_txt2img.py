@@ -163,7 +163,7 @@ class StableDiffusionUI_txt2img(StableDiffusionUI):
     
     def on_collect_button_click(self, b):
         with self.run_button_out:
-            dir = time.strftime(f'Favorates/{self.task}-%m%d/') 
+            dir = time.strftime(f'Favorites/{self.task}-%m%d/') 
             info = '收藏图片到 ' + dir
             dir = './' + dir
             os.makedirs(dir, exist_ok=True)
@@ -241,7 +241,7 @@ class OutputImageView():
         btn_collect = widgets.Button(
             icon = 'star-o',
             button_style = 'info',
-            tooltip = '将图片转移到Favorates文件夹中',
+            tooltip = '将图片转移到Favorites文件夹中',
             layout = Layout(
                 width= 'auto',
                 height = 'auto',
@@ -338,7 +338,7 @@ class OutputImageView():
         if opt_type == 'collect':
             new_state = 'collected'
             if self.state == new_state: return
-            dir = time.strftime(f'Favorates/{self.task_name}-%m%d/') 
+            dir = time.strftime(f'Favorites/{self.task_name}-%m%d/') 
             info = '收藏图片到 ' + dir
         elif opt_type == 'delete':
             new_state = 'deleted'
