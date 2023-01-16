@@ -1042,6 +1042,7 @@ class ImageCollectionView(Box):
             
         # 更新按钮状态
         data.state = dest_state
+        return dest_state
         
     def collect_all(self, data):
         if self.total < 1 or self.index < 0: return
