@@ -28,7 +28,7 @@ from .views import (
 from .xyplot import draw_xyplot, generate_test_image
 
 
-MAX_DISPLAY_COUNT = 20
+MAX_DISPLAY_COUNT = 50
 UNSET_TEXT = '(None)'
 
 KEY_SORTED = (
@@ -638,6 +638,8 @@ class StableDiffusionUI_xyplot(StableDiffusionUI):
     def on_run_plot_click(self, b):
         with freeze(b), self.run_button_out:
             clear_output()
+            self.collection_view.visible = False
+            self.collection_view.clear()
             x_datas = self._tabX.get_datas()
             y_datas = self._tabY.get_datas()
             
@@ -683,6 +685,7 @@ class StableDiffusionUI_xyplot(StableDiffusionUI):
                 options['output_dir'],
                 time.strftime(f'XYPlot_{x_total}x{y_total}_%Y-%m-%d_%H-%M-%S.jpg'),
             )
+            os.makedirs(options['output_dir'], exist_ok=True)
             plot.save(_filepath)
             self.collection_view.append_show_last(_filepath)
         
@@ -1025,6 +1028,7 @@ class ImageCollectionView(Box):
         image_path = data.image_path
         image_name = os.path.basename(image_path)
         if not os.path.isfile(image_path):
+            print(f'未找到文件：{image_path}')
             warning(f'未找到文件：{image_path}')
             data.state = self.FileState.Unknown
             return data.state
@@ -1042,6 +1046,7 @@ class ImageCollectionView(Box):
             
         # 更新按钮状态
         data.state = dest_state
+        data.image_path = os.path.join(dir,image_name)
         return dest_state
         
     def collect_all(self, data):

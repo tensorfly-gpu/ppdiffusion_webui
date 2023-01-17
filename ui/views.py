@@ -559,14 +559,14 @@ def _create_WHView(width_value = 512, height_value = 512):
         value=width_value,
         min=64,
         max=1440,
-        step=16,
+        step=8,
     )
     w_height = BoundedIntText(
         layout=_layout,
         value=height_value,
         min=64,
         max=1440,
-        step=16,
+        step=8,
     )
     
     def validate(change):
