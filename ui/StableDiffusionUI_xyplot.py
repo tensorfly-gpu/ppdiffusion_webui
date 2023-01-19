@@ -665,10 +665,9 @@ class StableDiffusionUI_xyplot(StableDiffusionUI):
             for i in range(x_total * y_total):
                 x, y = (i%x_total, i//x_total) if horizontal else (i//y_total, i%y_total)
                 x, y = x_datas[x], y_datas[y]
-                opts = Bunch(options)
-                opts.update(x)
-                opts.update(y)
-                task_list.append(opts)
+                task_list.append(
+                    self.merge_options(options,x,y)
+                )
             
             # 开始生成图片
             for option in task_list:
@@ -716,6 +715,8 @@ class StableDiffusionUI_xyplot(StableDiffusionUI):
     def test_run_plot_click(self,b):
         with freeze(b), self.run_button_out:
             clear_output()
+            self.collection_view.visible = False
+            self.collection_view.clear()
             x_datas = self._tabX.get_datas()
             y_datas = self._tabY.get_datas()
             
@@ -763,6 +764,7 @@ class StableDiffusionUI_xyplot(StableDiffusionUI):
                 options['output_dir'],
                 time.strftime(f'XYPlot_{x_total}x{y_total}_%Y-%m-%d_%H-%M-%S.jpg'),
             )
+            os.makedirs(options['output_dir'], exist_ok=True)
             plot.save(_filepath)
             self.collection_view.append_show_last(_filepath)
             
