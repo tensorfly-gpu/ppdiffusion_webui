@@ -4,6 +4,7 @@ class safe_open():
 
     md_size = 0
     offset = 0
+    meta = {}
     metadata = b''
     _TYPES = {
         #"BF16": np.bfloat16,
@@ -33,6 +34,8 @@ class safe_open():
         self.file.seek(8)
         self.metadata = self.file.read(self.md_size)
         self.metadata = eval(str(self.metadata, 'utf-8'))
+        if "__metadata__" in self.metadata.keys():
+            self.meta = self.metadata.pop("__metadata__")
 
     def keys(self):
         return self.metadata.keys()
