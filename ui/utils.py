@@ -314,9 +314,6 @@ class StableDiffusionFriendlyPipeline(HasTraits):
 
             path = Path(opt.concepts_library_dir)
             if path.exists():
-                #file_paths = path.glob("*.pdparams")
-                file_paths = [p for p in path.glob("*.pdparams")]
-
                 # conversion of .pt -> .pdparams embedding
                 pt_files = path.glob("*.pt")
                 for pt_file in pt_files:
@@ -324,6 +321,9 @@ class StableDiffusionFriendlyPipeline(HasTraits):
                         convert_pt_to_pdparams(pt_file, dim = 768, save = True)
                     except:
                         pass
+
+                #file_paths = path.glob("*.pdparams")
+                file_paths = [p for p in path.glob("*.pdparams")]
             
             if opt.concepts_library_dir.endswith('.pdparams') and os.path.exists(opt.concepts_library_dir): 
                 # load single file
