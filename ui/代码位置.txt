@@ -1,0 +1,9 @@
+考虑到ui文件夹实在是太乱了，所以我建议建立一个这样的描述文件提示各文件对应的模块方便日后修改
+
+deepdanbooru{
+    deepdanbooru.pdparams #模型文件
+    deep_danbooru_model.py #模型结构
+    tags.txt #模型输出需要用到的tags列表
+    deepdanbooru_use.py #调用deepdanbooru
+    DeepdanbooruUI.py deepdanbooru 的ui文件
+}

@@ -76,7 +76,11 @@ config = {
         "output_dir": 'outputs/dreambooth',
     },
     "convert": {
-        "model_root": 'models/',
+        "checkpoint_path": '',
+        'dump_path': 'outputs/convert'
+    },
+    "deepdanbooru": {
+        "image_path": 'resources/image_Kurisu.png',
     },
 }
 
