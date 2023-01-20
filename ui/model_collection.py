@@ -128,8 +128,7 @@ class ObservableModelCollection(HasTraits):
             self._update_list()
     
     def _update_list(self):
-        sorted(local_model_list)
-        new_models = tuple(default_model_list) + tuple(local_model_list)
+        new_models = tuple(default_model_list) + tuple(sorted(local_model_list))
         if new_models != self.models:
             self.models = new_models
 
