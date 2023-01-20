@@ -183,7 +183,9 @@ def convert_pt_to_pdparams(path, dim = 768, save = True):
 
     if save:
         # locate the name of embedding
-        name = ''.join(filter(lambda x: ord(x) > 20, data.split('nameq\x12X')[1].split('q\x13X')[0]))
+        _tmp = data.split('nameq\x12X')[1].split('q\x13X')[0]
+        _tmp = str(bytes(_tmp, 'latin'), 'utf8')
+        name = ''.join(filter(lambda x: ord(x) > 20, _tmp))
         paddle.save({name: tensor}, path[:-3] + '.pdparams')
 
     return tensor
