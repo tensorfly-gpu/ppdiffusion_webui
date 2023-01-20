@@ -57,6 +57,7 @@ from functools import lru_cache
 import numpy as np
 from _io import BufferedReader
 
+from .safetensor import safe_open
 MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
 
 
@@ -985,7 +986,15 @@ def main(args): #主函数
             args.vae_checkpoint_path = None
     print("正在开始转换，请耐心等待！！！")
     image_size = 512
-    checkpoint = load_torch(args.checkpoint_path)
+    checkpoint = {}
+    if args.checkpoint_path.endswith("ckpt"):
+        checkpoint = load_torch(args.checkpoint_path)
+    else:
+        tensor = safe_open(args.checkpoint_path)
+        tensor.get_md_size()
+        tensor.get_metadata()
+        for key in tensor.keys():
+            checkpoint[key] = tensor.get_tensor(key)
     checkpoint = checkpoint.get("state_dict", checkpoint)
     if args.original_config_file is None:
         get_path_from_url("https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/v1-inference.yaml", root_dir="./")
