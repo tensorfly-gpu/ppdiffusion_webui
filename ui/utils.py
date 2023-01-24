@@ -200,38 +200,50 @@ def get_multiple_tokens(token, num = 1, ret_list = True):
         return tokens
     return ' '.join(tokens)
 
-
-def collect_local_ckpts(base_paths = None):
+def collect_target_files(extensions, base_paths = None):
+    if isinstance(extensions, str):
+        extensions = (extensions,)
+    
     if base_paths is None:
         base_paths = [
             './',
-            './ckpt/',
         ] + [os.path.join('./data', x) for x in os.listdir('./data')]
     elif isinstance(base_paths, str):
-        base_paths = [base_paths,]
-        
-    models = []
+        base_paths = (base_paths,)
+    
+    result = [ [] for x in extensions ]
+    
     for base_path in base_paths:
         if not os.path.isdir(base_path): continue
         for name in os.listdir(base_path):
-            if name.startswith('.'): continue
-            
             path = os.path.join(base_path, name)
             
+            if name.startswith('.'): continue
             if path in base_paths: continue
             if os.path.isdir(path): pass
-            elif os.path.isfile(path) and name.endswith('.ckpt'):    #不考虑大小写问题
-                models.append(path)
-                continue
+            elif not os.path.isfile(path): continue
             else:
+                ext = name.partition('.')[2]    # 考虑到.vae.pt，从左边开始截断
+                if ext and (ext in extensions):
+                    result[extensions.index(ext)].append(path)
                 continue
             
             for name2 in os.listdir(path):
-                if os.path.isfile(path) and name.endswith('.ckpt'):
-                    models.append(path)
-    
-    sorted(models)
-    return models
+                path = os.path.join(path, name2)
+                name = name2
+                if name.startswith('.'): continue
+                if path in base_paths: continue
+                if not os.path.isfile(path): continue
+                else:
+                    ext = name.rpartition('.')[2]
+                    if ext and (ext in extensions):
+                        result[extensions.index(ext)].append(path)
+                    continue
+                    
+    return tuple(tuple(sorted(x)) for x in result)
+
+def collect_local_ckpts(base_paths = None):
+    return collect_target_files(base_paths, 'ckpt')
     
 class StableDiffusionFriendlyPipeline(HasTraits):
     model = Unicode()

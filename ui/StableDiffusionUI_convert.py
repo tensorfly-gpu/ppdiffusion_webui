@@ -4,7 +4,7 @@ from ipywidgets import Layout
 from collections import OrderedDict
 from IPython.display import clear_output
 from .ui import pipeline, get_widget_extractor
-from .utils import empty_cache, collect_local_ckpts
+from .utils import empty_cache, collect_target_files
 from .convert import parse_args as convert_parse_args
 from .convert import main as convert_parse_main
 from .views import createView
@@ -55,6 +55,10 @@ class StableDiffusionUI_convert(StableDiffusionConvertUI):
         }
         args.update(kwargs)
         
+        ckpts, safetensors, vaes = collect_target_files(
+            extensions = ('ckpt', 'safetensors', 'vae.pt')
+        )
+        
         layoutCol12 = Layout(
             flex = "12 12 90%",
             margin = "0.5em",
@@ -86,14 +90,13 @@ Non-EMA weights are usually better to continue fine-tuning.""",
             layout=layoutCol12, style=styleDescription,
             description='ckpt模型文件位置',
             description_tooltip='你要转换的模型位置',
-            options=collect_local_ckpts(),
+            options = ckpts + safetensors,
         )
-        widget_opt['vae_checkpoint_path'] = widgets.Text(
+        widget_opt['vae_checkpoint_path'] = widgets.Combobox(
             layout=layoutCol12, style=styleDescription,
             description='vae文件位置',
             description_tooltip='指定一个vae用于替代ckpt中的vae，提别是ckpt中不包含vae的时候',
-            value='',
-            disabled=False
+            options = vaes,
         )
         widget_opt['model_root'] = widgets.Text(
             layout=layoutCol12, style=styleDescription,
