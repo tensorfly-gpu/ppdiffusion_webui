@@ -67,13 +67,12 @@ def collect_local_model_names(base_paths = None):
                 continue
             
             for name2 in os.listdir(path):
-                if name.startswith('.'): continue
+                if name2.startswith('.'): continue
                 path2 = os.path.join(path, name2)
                 if os.path.isdir(path2) and is_avaliable_model(path2):
                     models.append(f'{name}/{name2}')
                     continue
-    
-    sorted(models)
+    models.sort()
     return models
     
 
@@ -128,7 +127,8 @@ class ObservableModelCollection(HasTraits):
             self._update_list()
     
     def _update_list(self):
-        new_models = tuple(default_model_list) + tuple(sorted(local_model_list))
+        local_model_list.sort()
+        new_models = tuple(default_model_list) + tuple(local_model_list)
         if new_models != self.models:
             self.models = new_models
 
