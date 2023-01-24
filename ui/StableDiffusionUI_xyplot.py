@@ -77,6 +77,7 @@ def check_xyplot_datas(xDatas, yDatas, prompt):
     
     if (len(xDatas) * len(yDatas) == 1):
         warning('1行1列这怎么跑xy图？')
+        critical = True
     
     # 检查行列参数完全相同
     for i in range(len(xDatas)):
@@ -616,7 +617,7 @@ class StableDiffusionUI_xyplot(StableDiffusionUI):
         )
 
     def on_check_button_click(self,b):
-        with self.run_button_out:
+        with freeze(b), self.run_button_out:
             clear_output()
             check_xyplot_datas(
                 self._tabX.get_datas(),

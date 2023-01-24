@@ -100,7 +100,7 @@ def context_nologging():
     try:
         yield
     finally:
-        logging.disable(30)
+        logging.disable(20)
  
 def save_image_info(image, path = './outputs/', existing_info = None):
     """Save image to a path with arguments."""
