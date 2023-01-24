@@ -987,14 +987,17 @@ def main(args): #主函数
     print("正在开始转换，请耐心等待！！！")
     image_size = 512
     checkpoint = {}
-    if args.checkpoint_path.endswith("ckpt"):
+    ext = args.checkpoint_path.rpartition('.')[2]
+    if "ckpt" == ext:
         checkpoint = load_torch(args.checkpoint_path)
-    else:
+    elif "safetensors" == ext:
         tensor = safe_open(args.checkpoint_path)
         tensor.get_md_size()
         tensor.get_metadata()
         for key in tensor.keys():
             checkpoint[key] = tensor.get_tensor(key)
+    else:
+        raise ValueError(f'未知的模型扩展名（{ext}）')
     checkpoint = checkpoint.get("state_dict", checkpoint)
     if args.original_config_file is None:
         get_path_from_url("https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/v1-inference.yaml", root_dir="./")
