@@ -57,6 +57,7 @@ from functools import lru_cache
 import numpy as np
 from _io import BufferedReader
 
+from .safetensor import safe_open
 MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
 
 
@@ -985,7 +986,15 @@ def main(args): #主函数
             args.vae_checkpoint_path = None
     print("正在开始转换，请耐心等待！！！")
     image_size = 512
-    checkpoint = load_torch(args.checkpoint_path)
+    checkpoint = {}
+    if args.checkpoint_path.endswith("ckpt"):
+        checkpoint = load_torch(args.checkpoint_path)
+    else:
+        tensor = safe_open(args.checkpoint_path)
+        tensor.get_md_size()
+        tensor.get_metadata()
+        for key in tensor.keys():
+            checkpoint[key] = tensor.get_tensor(key)
     checkpoint = checkpoint.get("state_dict", checkpoint)
     if args.original_config_file is None:
         get_path_from_url("https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/v1-inference.yaml", root_dir="./")
@@ -1052,7 +1061,14 @@ def main(args): #主函数
     # 2. Convert the VAE model.
     vae_config = create_vae_diffusers_config(original_config, image_size=image_size)
     if args.vae_checkpoint_path is not None:
-        vae_checkpoint = load_torch(args.vae_checkpoint_path)
+        if args.vae_checkpoint_path.endswith("pt"):
+            vae_checkpoint = load_torch(args.vae_checkpoint_path)
+        else:
+            tensor = safe_open(args.vae_checkpoint_path)
+            tensor.get_md_size()
+            tensor.get_metadata()
+            for key in tensor.keys():
+                vae_checkpoint[key] = tensor.get_tensor(key)
         print(f"发现 {args.vae_checkpoint_path}，我们将转换该文件的vae权重！")
         only_vae = True
     else:
