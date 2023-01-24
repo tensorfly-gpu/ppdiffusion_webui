@@ -6,28 +6,30 @@ if DEBUG_UI:
     print('==================================================')
     print('调试环境')
     print('==================================================')
-    from .StableDiffusionUI_txt2img import StableDiffusionUI_txt2img
-    from .StableDiffusionUI_img2img import StableDiffusionUI_img2img
+    # from .StableDiffusionUI_txt2img import StableDiffusionUI_txt2img
+    # from .StableDiffusionUI_img2img import StableDiffusionUI_img2img
     
-    gui_txt2img = StableDiffusionUI_txt2img(**config['txt2img'])
-    gui_img2img = StableDiffusionUI_img2img(**config['img2img'])
-    gui_inpaint = gui_img2img
+    from .StableDiffusionUI_xyplot import (
+        StableDiffusionUI_xyplot,
+    )
     
 else:
     
     from .ui import (
-        StableDiffusionUI_text_inversion,
-        StableDiffusionUI_dreambooth,
         pipeline_superres,
         pipeline,
-        StableDiffusionUI_convert,
     )
-    from .StableDiffusionUI_txt2img import StableDiffusionUI_txt2img
+    from .StableDiffusionUI_text_inversion import StableDiffusionUI_text_inversion
+    from .StableDiffusionUI_dreambooth import StableDiffusionUI_dreambooth
+    from .StableDiffusionUI_convert import StableDiffusionUI_convert
+    # from .StableDiffusionUI_txt2img import StableDiffusionUI_txt2img
     from .StableDiffusionUI_img2img import StableDiffusionUI_img2img
+    from .StableDiffusionUI_xyplot import StableDiffusionUI_xyplot
     from .SuperResolutionUI import SuperResolutionUI
     from .DeepdanbooruUI import DeepdanbooruUI
 
-    gui_txt2img = StableDiffusionUI_txt2img(
+
+    gui_txt2img = StableDiffusionUI_xyplot(
         **config['txt2img']
     )
     gui_img2img = StableDiffusionUI_img2img(
@@ -40,7 +42,7 @@ else:
     gui_train_text_inversion = StableDiffusionUI_text_inversion(
         **config['train_text_inversion']
     )
-    gui_text_inversion = StableDiffusionUI_txt2img(
+    gui_text_inversion = StableDiffusionUI_xyplot(
         **config['text_inversion']
     )
     gui_dreambooth = StableDiffusionUI_dreambooth( #dreamboothUI
@@ -49,7 +51,7 @@ else:
     gui_convert = StableDiffusionUI_convert(
         **config['convert']
     )
-    gui_inpaint = gui_img2img
     gui_deepdanbooru = DeepdanbooruUI(
         **config['deepdanbooru']
     )
+    gui_inpaint = gui_img2img
