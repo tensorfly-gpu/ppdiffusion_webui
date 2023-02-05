@@ -7,7 +7,6 @@ class safe_open():
     meta = {}
     metadata = b''
     _TYPES = {
-        #"BF16": np.bfloat16,
         "F64": np.float64,
         "F32": np.float32,
         "F16": np.float16,
@@ -23,7 +22,7 @@ class safe_open():
     }
 
     def __init__(self, path):
-        self.file = open(path, "rb") 
+        self.file = open(path, "rb")
 
     def get_md_size(self):
         self.file.seek(0)
@@ -34,7 +33,7 @@ class safe_open():
         self.file.seek(8)
         self.metadata = self.file.read(self.md_size)
         self.metadata = eval(str(self.metadata, 'utf-8'))
-        if "__metadata__" in self.metadata.keys():
+        if '__metadata__' in self.metadata.keys():
             self.meta = self.metadata.pop("__metadata__")
 
     def keys(self):
@@ -43,8 +42,8 @@ class safe_open():
     def get_type(self, tp):
         return self._TYPES[tp]
 
-    def get_tensor(self, key):
-        info = self.metadata[key]
+    def get_tensor(self, ke):
+        info = self.metadata[ke]
         start = info["data_offsets"][0]
         size = info["data_offsets"][1]-start
         shape = info["shape"]
@@ -52,3 +51,11 @@ class safe_open():
         self.file.seek(self.offset+start)
         return np.frombuffer(self.file.read(size), dtype=d_type).reshape(shape)
 
+def load_st(path):
+    t = safe_open(path)
+    t.get_md_size()
+    t.get_metadata()
+    dic = {}
+    for key in t.keys():
+        dic[key] = t.get_tensor(key)
+    return dic
